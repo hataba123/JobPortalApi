@@ -39,5 +39,9 @@ namespace JobPortalApi.Models
 
         [MaxLength(500)]
         public string Tags { get; set; } // Lưu dạng "tag1,tag2,tag3"
+
+        public Guid? UserId { get; set; } // dùng nullable để tránh lỗi cascade
+
+
     }
 }

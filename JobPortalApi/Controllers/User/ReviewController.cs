@@ -16,6 +16,12 @@ namespace JobPortalApi.Controllers.User
         {
             _reviewService = reviewService;
         }
+        [HttpGet]
+        public async Task<IActionResult> GetAll()
+        {
+            var companies = await _reviewService.GetAllAsync();
+            return Ok(companies);
+        }
 
         [HttpGet("company/{companyId}")]
         public async Task<IActionResult> GetByCompany(Guid companyId)

@@ -3,6 +3,7 @@ using JobPortalApi.Models;
 using JobPortalApi.Services.Interface.User;
 using Microsoft.EntityFrameworkCore;
 using System;
+using AutoMapper;
 
 namespace JobPortalApi.Services.User
 {
@@ -59,7 +60,53 @@ namespace JobPortalApi.Services.User
                 })
                 .FirstOrDefaultAsync();
         }
+        public async Task<IEnumerable<JobPostDto>> GetByCompanyIdAsync(Guid companyId)
+        {
+            var jobPosts = await _context.JobPosts
+                .Where(j => j.CompanyId == companyId)
+                .Include(j => j.Category) // ✅ Load Category để tránh null
+                .Include(j => j.Company)  // ✅ Load Company nếu cần tên công ty
+                .ToListAsync();
 
+            var jobPostDtos = jobPosts.Select(j => new JobPostDto
+            {
+                Id = j.Id,
+                Title = j.Title,
+                Description = j.Description,
+                Location = j.Location,
+                Salary = j.Salary,
+                Type = j.Type,
+                Logo = j.Logo,
+                Tags = j.Tags,
+                CreatedAt = j.CreatedAt,
+                CategoryName = j.Category != null ? j.Category.Name : "", // tránh null
+                CompanyName = j.Company != null ? j.Company.Name : ""
+            });
+
+            return jobPostDtos;
+        }
+        public async Task<IEnumerable<JobPostDto>> GetByCategoryIdAsync(Guid categoryId)
+        {
+            var jobPosts = await _context.JobPosts
+                .Where(j => j.CategoryId == categoryId)
+                .Select(j => new JobPostDto
+                {
+                    Id = j.Id,
+                    Title = j.Title,
+                    Description = j.Description,
+                    Location = j.Location,
+                    Salary = j.Salary,
+                    Type = j.Type,
+                    Logo = j.Logo,
+                    Tags = j.Tags,
+                    CreatedAt = j.CreatedAt,
+                    CategoryName = j.Category.Name,
+                    CompanyName = j.Company != null ? j.Company.Name : ""
+                })
+                .ToListAsync();
+
+            return jobPosts;
+        }
         public async Task<IEnumerable<JobPostDto>> GetByEmployerIdAsync(Guid employerId)
         {
             return await _context.JobPosts
@@ -120,6 +167,7 @@ namespace JobPortalApi.Services.User
             job.Tags = dto.Tags;
             job.CategoryId = dto.CategoryId;
             job.CompanyId = dto.CompanyId;
+            job.CompanyName = dto.CompanyName;
             job.CreatedAt = DateTime.UtcNow;
 
             _context.JobPosts.Update(job);

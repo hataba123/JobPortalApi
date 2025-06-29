@@ -1,9 +1,12 @@
 ﻿using JobPortalApi.DTOs.shared;
 
-public interface IAuthService
+namespace JobPortalApi.Services.Interface.User
 {
-    Task<string> RegisterAsync(RegisterRequest request);
-    Task<string> LoginAsync(LoginRequest request);
-    Task<UserDto> GetUserByEmailAsync(string email); // 👈 Thêm hàm này
+    public interface IAuthService
+    {
+        Task<string> RegisterAsync(RegisterRequest request);
+        Task<string> LoginAsync(LoginRequest request);
+        Task<UserDto> GetUserByEmailAsync(string email); // 👈 Thêm hàm này
 
+    }
 }

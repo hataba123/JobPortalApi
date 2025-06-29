@@ -51,5 +51,7 @@ namespace JobPortalApi.Models
         public Guid CategoryId { get; set; }
         [ForeignKey(nameof(CategoryId))]
         public Category Category { get; set; }
+        public Guid? CompanyName { get; set; }
+
     }
 }

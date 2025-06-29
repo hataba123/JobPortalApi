@@ -1,7 +1,7 @@
 ﻿using JobPortalApi.DTOs.AdminUser;
 using JobPortalApi.DTOs.shared;
 
-namespace JobPortalApi.Services.Interface
+namespace JobPortalApi.Services.Interface.Admin
 {
     public interface IUserService
     {

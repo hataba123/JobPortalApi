@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using JobPortalApi.Models;
 using JobPortalApi.DTOs.shared;
+using JobPortalApi.Services.Interface.Admin;
 namespace JobPortalApi.Services.Admin
 {
     public class UserService : IUserService

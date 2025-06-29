@@ -7,7 +7,7 @@ namespace JobPortalApi.Controllers.Admin
     [Authorize(Roles = "Admin")]
     [ApiController]
     [Route("api/admin/dashboard")]
-    public class AdminDashboardController : ControllerBase
+    public class AdminDashboardController : Controller
     {
         private readonly IDashboardService _dashboardService;
 

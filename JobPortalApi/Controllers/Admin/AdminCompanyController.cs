@@ -8,7 +8,7 @@ namespace JobPortalApi.Controllers.Admin
     [Authorize(Roles = "Admin")]
     [ApiController]
     [Route("api/admin/companies")]
-    public class AdminCompanyController : ControllerBase
+    public class AdminCompanyController : Controller
     {
         private readonly ICompanyService _companyService;
 

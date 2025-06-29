@@ -16,35 +16,35 @@ namespace JobPortalApi.Models
         public User User { get; set; }
 
         [MaxLength(300)]
-        public string ResumeUrl { get; set; }
+        public string? ResumeUrl { get; set; }
 
         [MaxLength(1000)]
-        public string Experience { get; set; }
+        public string? Experience { get; set; }
 
         [MaxLength(500)]
-        public string Skills { get; set; } // "skill1,skill2"
+        public string? Skills { get; set; } // "skill1,skill2"
 
         [MaxLength(200)]
-        public string Education { get; set; }
+        public string? Education { get; set; }
 
         public DateTime? Dob { get; set; }
 
         [MaxLength(10)]
-        public string Gender { get; set; }
+        public string? Gender { get; set; }
 
         [MaxLength(300)]
-        public string PortfolioUrl { get; set; }
+        public string? PortfolioUrl { get; set; }
 
         [MaxLength(300)]
-        public string LinkedinUrl { get; set; }
+        public string? LinkedinUrl { get; set; }
 
         [MaxLength(300)]
-        public string GithubUrl { get; set; }
+        public string? GithubUrl { get; set; }
 
         [MaxLength(1000)]
-        public string Certificates { get; set; } // "cert1,cert2"
+        public string? Certificates { get; set; } // "cert1,cert2"
 
         [MaxLength(1000)]
-        public string Summary { get; set; }
+        public string? Summary { get; set; }
     }
 }

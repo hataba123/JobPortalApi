@@ -13,6 +13,12 @@ public class ApplicationDbContext : DbContext
     public DbSet<JobPost> JobPosts { get; set; }
     public DbSet<User> Users { get; set; }
     public DbSet<Job> Jobs { get; set; }
+    public DbSet<Blog> Blogs { get; set; }
+    public DbSet<BlogAuthor> BlogAuthors { get; set; }
+    public DbSet<BlogCategory> BlogCategories { get; set; }
+    public DbSet<BlogView> BlogViews { get; set; }
+    public DbSet<BlogLike> BlogLikes { get; set; }
+
     public DbSet<Company> Companies { get; set; }
     public DbSet<SavedJob> SavedJobs { get; set; }
     public DbSet<Category> Categories { get; set; } // Thêm DbSet<Category> nếu có
@@ -38,6 +44,7 @@ public class ApplicationDbContext : DbContext
                             : JsonSerializer.Deserialize<List<string>>(v, (JsonSerializerOptions?)null))
                 .HasColumnType("nvarchar(max)");
         });
+
         // Nếu muốn map bảng Users cũng vậy
         modelBuilder.Entity<User>()
             .ToTable("Users");

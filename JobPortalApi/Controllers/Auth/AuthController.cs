@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Mvc;
 using System.Security.Claims;
 using JobPortalApi.DTOs.Shared;
 using JobPortalApi.DTOs.shared;
+using JobPortalApi.Services.Interface.User;
 namespace JobPortalApi.Controllers.Auth
 {
     [AllowAnonymous] // ✅ Cho phép truy cập không cần JWT

@@ -1,6 +1,10 @@
-﻿using JobPortalApi.Services.Interface.User;
+﻿using JobPortalApi.Models;
+using JobPortalApi.Services.Admin;
+using JobPortalApi.Services.Interface.Admin;
+using JobPortalApi.Services.Interface.User;
 using JobPortalApi.Services.User;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
@@ -12,13 +16,28 @@ var jwtIssuer = builder.Configuration["Jwt:Issuer"];
 var jwtAudience = builder.Configuration["Jwt:Audience"];
 
 // Add services to the container.
+// Admin services
+builder.Services.AddScoped<JobPortalApi.Services.Interface.Admin.ICompanyService, JobPortalApi.Services.Admin.CompanyService>();
+builder.Services.AddScoped<IBlogService, BlogService>(); // 👈 THÊM DÒNG NÀY
+builder.Services.AddScoped<IRecruiterDashboardService, RecruiterDashboardService>();
 
-// dang ky AuthService
+builder.Services.AddScoped<IUserService, UserService>();
+builder.Services.AddScoped<IJobPostService, JobPostService>();
+builder.Services.AddScoped<INotificationService, NotificationService>();
+builder.Services.AddScoped<JobPortalApi.Services.Interface.Admin.IReviewService, JobPortalApi.Services.Admin.ReviewService>();
+builder.Services.AddScoped<IDashboardService, DashboardService>();
+
+//user service
+builder.Services.AddScoped<IPasswordHasher<User>, PasswordHasher<User>>();
+
 builder.Services.AddScoped<IAuthService, AuthService>();
-
-// dang ky JobPostService
+builder.Services.AddScoped<IRecruiterCandidateService, RecruiterCandidateService>();
+builder.Services.AddScoped<ISavedJobService, SavedJobService>();
+builder.Services.AddScoped<JobPortalApi.Services.Interface.User.IReviewService, JobPortalApi.Services.User.ReviewService>();
+builder.Services.AddScoped<ICategoryService, CategoryService>();
+builder.Services.AddScoped<JobPortalApi.Services.Interface.User.ICompanyService, JobPortalApi.Services.User.CompanyService>();
 builder.Services.AddScoped<IJobService, JobService>();
-// dang ky ApplyService
+
 builder.Services.AddScoped<IApplyService, ApplyService>();
 // add db context
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
@@ -29,8 +48,13 @@ builder.Services.AddDbContext<ApplicationDbContext>(options =>
             errorNumbersToAdd: null
         )
 ));
-
-
+// Cách 1: Cấu hình Swagger để phân biệt schema theo namespace
+//  SwaggerGeneratorException: Failed to generate schema for type CreateJobPostDto
+// 👉 Vì hai DTO khác nhau (User.JobPost.CreateJobPostDto và AdminJobPost.CreateJobPostDto) cùng tên class, nên Swashbuckle không thể phân biệt được khi sinh schema Swagger → gây lỗi trùng schemaId.
+builder.Services.AddSwaggerGen(options =>
+{
+    options.CustomSchemaIds(type => type.FullName); // 👈 Quan trọng
+});
 // Bật và cấu hình CORS
 builder.Services.AddCors(options =>
 {
@@ -56,7 +80,9 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
                 ValidateLifetime = true,
                 ValidateIssuerSigningKey = true,
                 ValidIssuer = jwtIssuer,
-                IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey))
+                IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey)),
+                   // 🔥 Quan trọng: map đúng claim role
+            RoleClaimType = "http://schemas.microsoft.com/ws/2008/06/identity/claims/role",
             };
         });
     builder.Services.AddAuthorization();
@@ -90,8 +116,8 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     var app = builder.Build();
 
 
-    // Configure the HTTP request pipeline.
-    if (app.Environment.IsDevelopment())
+// Configure the HTTP request pipeline.
+if (app.Environment.IsDevelopment())
     {
         app.UseSwagger();
         app.UseSwaggerUI();
