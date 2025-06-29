@@ -1,5 +1,6 @@
 ﻿using JobPortalApi.DTOs.AdminUser;
 using JobPortalApi.Services.Interface;
+using JobPortalApi.Services.Interface.Admin;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 

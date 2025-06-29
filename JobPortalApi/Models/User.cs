@@ -19,6 +19,8 @@ namespace JobPortalApi.Models
 
         /// Full name of the user.
         public string FullName { get; set; }
+        public DateTime CreatedAt { get; set; } // ✅ Dòng này phải tồn tại
+
 
         /// Role assigned to the user (Admin, Recruiter, or Candidate).
         // Entity Framework Core không yêu cầu tạo bảng riêng cho enum. Enum chỉ được ánh xạ vào một cột (column) trong bảng chứa nó

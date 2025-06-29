@@ -25,6 +25,18 @@ namespace JobPortalApi.Controllers.User
             var posts = await _jobService.GetAllAsync();
             return Ok(posts);
         }
+        [HttpGet("company/{companyId}")]
+        public async Task<IActionResult> GetByCompanyId(Guid companyId)
+        {
+            var jobPosts = await _jobService.GetByCompanyIdAsync(companyId);
+            return Ok(jobPosts); // Trả về 200 OK với danh sách job post
+        }
+        [HttpGet("category/{categoryId}")]
+        public async Task<IActionResult> GetByCategoryId(Guid categoryId)
+        {
+            var result = await _jobService.GetByCategoryIdAsync(categoryId);
+            return Ok(result);
+        }
 
         [HttpGet("{id}")]
         public async Task<IActionResult> GetById(Guid id)

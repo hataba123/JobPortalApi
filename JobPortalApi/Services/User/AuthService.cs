@@ -6,6 +6,7 @@ using System.Text;
 using JobPortalApi.Models;
 using JobPortalApi.Helpers;
 using JobPortalApi.DTOs.shared;
+using JobPortalApi.Services.Interface.User;
 
 namespace JobPortalApi.Services.User
 {
@@ -41,7 +42,29 @@ namespace JobPortalApi.Services.User
             // Lưu user vào DB
             _context.Users.Add(user);
             await _context.SaveChangesAsync();
+            // ✅ Nếu là Candidate thì tạo hồ sơ rỗng
+            if (user.Role == UserRole.Candidate)
+            {
+                var candidateProfile = new CandidateProfile
+                {
+                    Id = Guid.NewGuid(),
+                    UserId = user.Id,
+                    ResumeUrl = null,
+                    Experience = null,
+                    Skills = null,
+                    Education = null,
+                    Dob = null,
+                    Gender = null,
+                    PortfolioUrl = null,
+                    LinkedinUrl = null,
+                    GithubUrl = null,
+                    Certificates = null,
+                    Summary = null
+                };
 
+                _context.candidateProfiles.Add(candidateProfile);
+                await _context.SaveChangesAsync();
+            }
             // Trả về JWT token
             return _jwtHelper.GenerateJwtToken(user); // ✅ Gọi helper
         }

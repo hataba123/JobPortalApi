@@ -1,9 +1,10 @@
 ﻿namespace JobPortalApi.DTOs.CandidateProfile
 {
-    public class CandidateProfileDto
+    public class CandidateProfileDetailDto
     {
         public Guid Id { get; set; }
         public Guid UserId { get; set; }
+        public string FullName { get; set; }
         public string? ResumeUrl { get; set; }
         public string? Experience { get; set; }
         public string? Skills { get; set; }
@@ -15,5 +16,6 @@
         public string? GithubUrl { get; set; }
         public string? Certificates { get; set; }
         public string? Summary { get; set; }
+        public string Email { get; set; }
     }
 }

@@ -11,5 +11,6 @@
         public List<string> Tags { get; set; }
         public Guid CategoryId { get; set; }
         public Guid? CompanyId { get; set; }
+        public Guid? CompanyName { get; set; }
     }
 }

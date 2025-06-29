@@ -10,6 +10,10 @@ namespace JobPortalApi.Services.Interface.User
         Task<IEnumerable<JobPostDto>> GetByEmployerIdAsync(Guid employerId);
         Task<JobPostDto> CreateAsync(CreateJobPostDto dto, Guid employerId);
         Task<JobPostDto?> UpdateAsync(Guid id, UpdateJobPostDto dto);
+        Task<IEnumerable<JobPostDto>> GetByCompanyIdAsync(Guid companyId);
+
         Task<bool> DeleteAsync(Guid id);
+        Task<IEnumerable<JobPostDto>> GetByCategoryIdAsync(Guid categoryId);
+
     }
 }

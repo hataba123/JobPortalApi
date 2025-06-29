@@ -24,8 +24,6 @@ namespace JobPortalApi.Services.Admin
             var totalCompanies = await _context.Companies.CountAsync();
             var totalJobPosts = await _context.JobPosts.CountAsync();
             var totalReviews = await _context.Review.CountAsync();
-            var pendingReviews = await _context.Review
-                .CountAsync(r => EF.Property<string>(r, "Status") == "Pending");
             var totalApplications = await _context.Jobs.CountAsync();
             var applicationsToday = await _context.Jobs
                 .CountAsync(a => a.AppliedAt >= today);
@@ -37,7 +35,6 @@ namespace JobPortalApi.Services.Admin
                 TotalCompanies = totalCompanies,
                 TotalJobPosts = totalJobPosts,
                 TotalReviews = totalReviews,
-                PendingReviews = pendingReviews,
                 TotalApplications = totalApplications,
                 ApplicationsToday = applicationsToday
             };
