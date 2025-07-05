@@ -2,7 +2,10 @@
 using JobPortalApi.DTOs.CandidateProfileDto;
 using JobPortalApi.Models;
 using JobPortalApi.Services.Interface.User;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using System.Security.Claims;
 
 namespace JobPortalApi.Services.User
 {
@@ -155,8 +158,11 @@ namespace JobPortalApi.Services.User
 
         public async Task<bool> UpdateAsync(Guid userId, CandidateProfileUpdateDto dto)
         {
-            var profile = await _context.candidateProfiles.FirstOrDefaultAsync(p => p.UserId == userId);
+            var profile = await _context.candidateProfiles
+                .Include(p => p.User)
+                .FirstOrDefaultAsync(p => p.UserId == userId); if (profile == null) return false;
             if (profile == null) return false;
+            // Cập nhật các trường của CandidateProfile
 
             profile.ResumeUrl = dto.ResumeUrl;
             profile.Experience = dto.Experience;
@@ -169,10 +175,59 @@ namespace JobPortalApi.Services.User
             profile.GithubUrl = dto.GithubUrl;
             profile.Certificates = dto.Certificates;
             profile.Summary = dto.Summary;
-
+            // Nếu có FullName hoặc Email thì cập nhật vào User
+            if (!string.IsNullOrEmpty(dto.FullName))
+                profile.User.FullName = dto.FullName;
+            if (!string.IsNullOrEmpty(dto.Email))
+                profile.User.Email = dto.Email;
             _context.candidateProfiles.Update(profile);
             await _context.SaveChangesAsync();
             return true;
         }
+        public async Task<string?> UploadCvAsync(Guid userId, IFormFile file)
+        {
+            if (file == null || file.Length == 0) return null;
+
+            var fileName = $"{Guid.NewGuid()}_{file.FileName}";
+            var uploadPath = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "uploads", "cv");
+
+            if (!Directory.Exists(uploadPath))
+                Directory.CreateDirectory(uploadPath);
+
+            var filePath = Path.Combine(uploadPath, fileName);
+            await using (var stream = new FileStream(filePath, FileMode.Create))
+            {
+                await file.CopyToAsync(stream);
+            }
+
+            var profile = await _context.candidateProfiles.FirstOrDefaultAsync(p => p.UserId == userId);
+            if (profile == null) return null;
+
+            profile.ResumeUrl = $"/uploads/cv/{fileName}";
+            _context.candidateProfiles.Update(profile);
+            await _context.SaveChangesAsync();
+
+            return profile.ResumeUrl;
+        }
+        public async Task<bool> DeleteCvAsync(Guid userId)
+        {
+            var profile = await _context.candidateProfiles.FirstOrDefaultAsync(p => p.UserId == userId);
+            if (profile == null || string.IsNullOrEmpty(profile.ResumeUrl))
+                return false;
+
+            var filePath = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", profile.ResumeUrl.TrimStart('/'));
+            if (File.Exists(filePath))
+            {
+                File.Delete(filePath);
+            }
+
+            profile.ResumeUrl = null;
+            _context.candidateProfiles.Update(profile);
+            await _context.SaveChangesAsync();
+
+            return true;
+        }
+
+
     }
 }

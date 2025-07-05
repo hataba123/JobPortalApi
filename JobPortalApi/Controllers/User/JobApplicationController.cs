@@ -58,7 +58,7 @@ namespace JobPortalApi.Controllers.User
 
         // ✅ Admin: get a single apply record
         [HttpGet("{id}")]
-        [Authorize(Roles = "Admin")]
+        [Authorize(Roles = "Admin,Candidate")]
         public async Task<IActionResult> GetById(Guid id)
         {
             var result = await _applyService.GetByIdAsync(id);

@@ -11,5 +11,9 @@ namespace JobPortalApi.Services.Interface.User
         Task<IEnumerable<CandidateProfileBriefDto>> GetCandidatesForRecruiterAsync(Guid recruiterId);
         Task<CandidateProfileDetailDto?> GetByUserIdAsync(Guid userId); // nếu controller cần
         Task<bool> UpdateAsync(Guid userId, CandidateProfileUpdateDto dto); // nếu controller cần
+        Task<string?> UploadCvAsync(Guid userId, IFormFile file);
+        Task<bool> DeleteCvAsync(Guid userId);
+
+
     }
 }

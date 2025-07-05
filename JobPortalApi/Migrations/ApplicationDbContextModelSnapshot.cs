@@ -123,7 +123,7 @@ namespace JobPortalApi.Migrations
 
                     b.HasIndex("AuthorId");
 
-                    b.ToTable("Blogs", (string)null);
+                    b.ToTable("Blogs");
                 });
 
             modelBuilder.Entity("JobPortalApi.Models.BlogAuthor", b =>
@@ -154,7 +154,7 @@ namespace JobPortalApi.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("BlogAuthors", (string)null);
+                    b.ToTable("BlogAuthors");
                 });
 
             modelBuilder.Entity("JobPortalApi.Models.BlogCategory", b =>
@@ -179,7 +179,7 @@ namespace JobPortalApi.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("BlogCategories", (string)null);
+                    b.ToTable("BlogCategories");
                 });
 
             modelBuilder.Entity("JobPortalApi.Models.BlogLike", b =>
@@ -204,7 +204,7 @@ namespace JobPortalApi.Migrations
 
                     b.HasIndex("BlogId");
 
-                    b.ToTable("BlogLikes", (string)null);
+                    b.ToTable("BlogLikes");
                 });
 
             modelBuilder.Entity("JobPortalApi.Models.BlogView", b =>
@@ -231,7 +231,7 @@ namespace JobPortalApi.Migrations
 
                     b.HasIndex("BlogId");
 
-                    b.ToTable("BlogViews", (string)null);
+                    b.ToTable("BlogViews");
                 });
 
             modelBuilder.Entity("JobPortalApi.Models.CandidateProfile", b =>
@@ -290,7 +290,7 @@ namespace JobPortalApi.Migrations
 
                     b.HasIndex("UserId");
 
-                    b.ToTable("CandidateProfiles", (string)null);
+                    b.ToTable("CandidateProfiles");
                 });
 
             modelBuilder.Entity("JobPortalApi.Models.Category", b =>
@@ -316,7 +316,7 @@ namespace JobPortalApi.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("Categories", (string)null);
+                    b.ToTable("Categories");
                 });
 
             modelBuilder.Entity("JobPortalApi.Models.Company", b =>
@@ -381,9 +381,7 @@ namespace JobPortalApi.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("UserId");
-
-                    b.ToTable("Companies", (string)null);
+                    b.ToTable("Companies");
                 });
 
             modelBuilder.Entity("JobPortalApi.Models.JobPost", b =>
@@ -399,9 +397,6 @@ namespace JobPortalApi.Migrations
                         .HasColumnType("uniqueidentifier");
 
                     b.Property<Guid?>("CompanyId")
-                        .HasColumnType("uniqueidentifier");
-
-                    b.Property<Guid?>("CompanyName")
                         .HasColumnType("uniqueidentifier");
 
                     b.Property<DateTime>("CreatedAt")
@@ -486,7 +481,7 @@ namespace JobPortalApi.Migrations
 
                     b.HasIndex("UserId");
 
-                    b.ToTable("Notifications", (string)null);
+                    b.ToTable("Notifications");
                 });
 
             modelBuilder.Entity("JobPortalApi.Models.Review", b =>
@@ -518,7 +513,7 @@ namespace JobPortalApi.Migrations
 
                     b.HasIndex("UserId");
 
-                    b.ToTable("Reviews", (string)null);
+                    b.ToTable("Reviews");
                 });
 
             modelBuilder.Entity("JobPortalApi.Models.SavedJob", b =>
@@ -633,16 +628,6 @@ namespace JobPortalApi.Migrations
                         .HasForeignKey("UserId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
-
-                    b.Navigation("User");
-                });
-
-            modelBuilder.Entity("JobPortalApi.Models.Company", b =>
-                {
-                    b.HasOne("JobPortalApi.Models.User", "User")
-                        .WithMany()
-                        .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.NoAction);
 
                     b.Navigation("User");
                 });

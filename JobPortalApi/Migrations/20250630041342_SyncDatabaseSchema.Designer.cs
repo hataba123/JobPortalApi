@@ -11,8 +11,8 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace JobPortalApi.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    [Migration("20250628122918_AddBlog")]
-    partial class AddBlog
+    [Migration("20250630041342_SyncDatabaseSchema")]
+    partial class SyncDatabaseSchema
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -373,6 +373,9 @@ namespace JobPortalApi.Migrations
                         .IsRequired()
                         .HasMaxLength(500)
                         .HasColumnType("nvarchar(500)");
+
+                    b.Property<Guid?>("UserId")
+                        .HasColumnType("uniqueidentifier");
 
                     b.Property<string>("Website")
                         .IsRequired()

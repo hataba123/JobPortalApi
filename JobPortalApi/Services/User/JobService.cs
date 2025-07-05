@@ -167,7 +167,6 @@ namespace JobPortalApi.Services.User
             job.Tags = dto.Tags;
             job.CategoryId = dto.CategoryId;
             job.CompanyId = dto.CompanyId;
-            job.CompanyName = dto.CompanyName;
             job.CreatedAt = DateTime.UtcNow;
 
             _context.JobPosts.Update(job);

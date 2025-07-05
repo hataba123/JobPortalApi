@@ -76,9 +76,14 @@ namespace JobPortalApi.Services.User
             var user = await _context.Users.FirstOrDefaultAsync(u => u.Email == request.Email);
 
             // Nếu không tìm thấy hoặc mật khẩu sai thì báo lỗi
-            if (user == null || !VerifyPassword(request.Password, user.PasswordHash))
-                throw new Exception("Email hoặc mật khẩu không đúng.");
+            if (user == null)
+                throw new Exception("Tài khoản không tồn tại.");
 
+            if (!request.IsOAuth)
+            {
+                if (!VerifyPassword(request.Password, user.PasswordHash))
+                    throw new Exception("Email hoặc mật khẩu không đúng.");
+            }
             // Trả về JWT token
             return _jwtHelper.GenerateJwtToken(user); // ✅ Gọi helper
         }

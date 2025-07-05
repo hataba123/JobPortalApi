@@ -46,5 +46,6 @@ namespace JobPortalApi.Models
 
         [MaxLength(1000)]
         public string? Summary { get; set; }
+
     }
 }

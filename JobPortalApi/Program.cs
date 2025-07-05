@@ -6,6 +6,7 @@ using JobPortalApi.Services.User;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.FileProviders;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 using System.Text;
@@ -20,7 +21,6 @@ var jwtAudience = builder.Configuration["Jwt:Audience"];
 builder.Services.AddScoped<JobPortalApi.Services.Interface.Admin.ICompanyService, JobPortalApi.Services.Admin.CompanyService>();
 builder.Services.AddScoped<IBlogService, BlogService>(); // 👈 THÊM DÒNG NÀY
 builder.Services.AddScoped<IRecruiterDashboardService, RecruiterDashboardService>();
-
 builder.Services.AddScoped<IUserService, UserService>();
 builder.Services.AddScoped<IJobPostService, JobPostService>();
 builder.Services.AddScoped<INotificationService, NotificationService>();
@@ -122,8 +122,13 @@ if (app.Environment.IsDevelopment())
         app.UseSwagger();
         app.UseSwaggerUI();
     }
-    // Hãy bật HTTPS nếu bạn dùng Swagger
-
+// Hãy bật HTTPS nếu bạn dùng Swagger
+    app.UseStaticFiles(new StaticFileOptions
+    {
+        FileProvider = new PhysicalFileProvider(
+        Path.Combine(Directory.GetCurrentDirectory(), "wwwroot")),
+        RequestPath = ""
+    });
     app.UseCors("AllowFrontends"); // phải gọi trước UseAuthorization() 
     app.UseHttpsRedirection();
     app.UseAuthentication(); // 🛡 Bắt buộc đặt trước UseAuthorization
