@@ -79,23 +79,22 @@ namespace JobPortalApi.Controllers.User
             var result = await _candidateService.GetCandidatesForRecruiterAsync(recruiterId);
             return Ok(result);
         }
-        [HttpGet("recruiter/debug/applied-ids")]
-        [Authorize(Roles = "Recruiter")]
-        public async Task<IActionResult> DebugAppliedCandidateIds()
+        [HttpPost("me/upload-cv")]
+        [Authorize(Roles = "Candidate")]
+        public async Task<IActionResult> UploadCV(IFormFile file)
         {
-            var recruiterId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
-            var candidateIds = await _context.Jobs
-                .Include(j => j.JobPost)
-                    .ThenInclude(jp => jp.Company)
-                .Where(j =>
-                    j.JobPost.Company != null &&
-                    j.JobPost.Company.UserId == recruiterId
-                )
-                .Select(j => j.CandidateId)
-                .Distinct()
-                .ToListAsync();
-
-            return Ok(candidateIds);
+            var userId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+            var url = await _candidateService.UploadCvAsync(userId, file);
+            return url != null ? Ok(new { url }) : NotFound("Không tìm thấy đơn ứng tuyển.");
         }
+        [HttpDelete("me/delete-cv")]
+        [Authorize(Roles = "Candidate")]
+        public async Task<IActionResult> DeleteCv()
+        {
+            var userId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+            var success = await _candidateService.DeleteCvAsync(userId);
+            return success ? Ok("Đã xóa CV thành công") : NotFound("Không tìm thấy đơn ứng tuyển để xóa CV.");
+        }
+
     }
 }

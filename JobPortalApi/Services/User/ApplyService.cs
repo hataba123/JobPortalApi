@@ -21,23 +21,34 @@ namespace JobPortalApi.Services.User
             if (jobPost == null)
                 throw new Exception("Công việc không tồn tại.");
 
-            var alreadyApplied = await _context.Jobs
-                .AnyAsync(a => a.JobPostId == request.JobPostId && a.CandidateId == candidateId);
-            if (alreadyApplied)
-                throw new Exception("Bạn đã ứng tuyển công việc này rồi.");
+            // Tìm hồ sơ ứng viên
+            var candidateProfile = await _context.candidateProfiles
+                .FirstOrDefaultAsync(c => c.UserId == candidateId);
+            if (candidateProfile == null)
+                throw new Exception("Hồ sơ ứng viên chưa tồn tại.");
+
+            // Nếu CV không được truyền từ request => dùng CV trong profile nếu có
+            var cvUrl = request.CVUrl;
+            if (string.IsNullOrEmpty(cvUrl))
+                cvUrl = candidateProfile.ResumeUrl;
+
+            if (string.IsNullOrEmpty(cvUrl))
+                throw new Exception("Bạn cần tải lên CV trước khi ứng tuyển.");
 
             var apply = new Job
             {
                 Id = Guid.NewGuid(),
                 JobPostId = request.JobPostId,
                 CandidateId = candidateId,
-                CVUrl = request.CVUrl,
-                AppliedAt = DateTime.UtcNow
+                CVUrl = cvUrl,
+                AppliedAt = DateTime.UtcNow,
+                Status = ApplyStatus.Pending
             };
 
             _context.Jobs.Add(apply);
             await _context.SaveChangesAsync();
         }
+
 
         public async Task<List<CandidateApplicationDto>> GetCandidatesAppliedToJob(Guid employerId, Guid jobPostId)
         {
@@ -51,11 +62,14 @@ namespace JobPortalApi.Services.User
                 .Include(a => a.Candidate)
                     .Select(a => new CandidateApplicationDto
                     {
+                        Id = a.Id, // ✅ cần gán ở đây
                         CandidateId = a.CandidateId,
                         FullName = a.Candidate.FullName,
                         Email = a.Candidate.Email,
                         AppliedAt = a.AppliedAt,
-                        CVUrl = a.CVUrl
+                        CVUrl = a.CVUrl,
+                        Status = a.Status // ✅ THÊM DÒNG NÀY
+
                     })
                 .ToListAsync();
         }
@@ -67,13 +81,16 @@ namespace JobPortalApi.Services.User
                 .Include(a => a.JobPost)
                 .Select(a => new JobAppliedDto
                 {
+                    Id = a.Id,
                     JobPostId = a.JobPostId,
                     Title = a.JobPost.Title,
                     Location = a.JobPost.Location,
                     Salary = a.JobPost.Salary,
                     SkillsRequired = a.JobPost.SkillsRequired,
                     Description = a.JobPost.Description,
-                    AppliedAt = a.AppliedAt
+                    AppliedAt = a.AppliedAt,
+                    Status = a.Status // ✅ THÊM DÒNG NÀY
+
                 })
                 .ToListAsync();
         }

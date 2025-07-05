@@ -83,5 +83,59 @@ namespace JobPortalApi.Controllers.Auth
 
             return Ok(user); // Trả về UserDto
         }
+
+        [HttpPost("oauth-login")]
+        [ProducesResponseType(typeof(AuthResponse), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(string), StatusCodes.Status400BadRequest)]
+        public async Task<IActionResult> OAuthLogin([FromBody] OAuthLoginRequest request)
+        {
+            try
+            {
+                // Kiểm tra user đã tồn tại chưa
+                var existingUser = await _authService.GetUserByEmailAsync(request.Email);
+
+                if (existingUser == null)
+                {
+                    // Nếu chưa có, tạo user mới (tùy vai trò mặc định)
+                    var registerDto = new RegisterRequest
+                    {
+                        Email = request.Email,
+                        FullName = request.Name,
+                        Password = Guid.NewGuid().ToString(), // Random password vì không cần dùng
+                        Role = UserRole.Candidate // hoặc cho phép FE gửi Role nếu muốn phân loại
+                    };
+
+                    var token = await _authService.RegisterAsync(registerDto);
+                    var user = await _authService.GetUserByEmailAsync(request.Email);
+
+                    return Ok(new AuthResponse
+                    {
+                        Token = token,
+                        User = user
+                    });
+                }
+                else
+                {
+                    // Nếu đã có, đăng nhập luôn
+                    var token = await _authService.LoginAsync(new LoginRequest
+                    {
+                        Email = request.Email,
+                        Password = "", // Không cần vì bạn có thể skip validate password cho OAuth
+                        IsOAuth = true // 👈 Đề xuất: truyền cờ để login bypass password nếu OAuth
+                    });
+
+                    return Ok(new AuthResponse
+                    {
+                        Token = token,
+                        User = existingUser
+                    });
+                }
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(ex.Message);
+            }
+        }
+
     }
 }

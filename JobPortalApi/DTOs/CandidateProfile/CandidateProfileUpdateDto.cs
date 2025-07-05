@@ -2,6 +2,9 @@
 {
     public class CandidateProfileUpdateDto
     {
+        // Thêm nếu muốn cho phép cập nhật
+        public string? FullName { get; set; }
+        public string? Email { get; set; }
         public string? ResumeUrl { get; set; }
         public string? Experience { get; set; }
         public string? Skills { get; set; }
