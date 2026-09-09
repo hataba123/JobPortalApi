@@ -2,6 +2,7 @@
 using JobPortalApi.DTOs.Apply;
 using JobPortalApi.Models.Enums;
 using JobPortalApi.Services.Interface.User;
+using JobPortalApi.Services.Helpers;
 using Microsoft.EntityFrameworkCore;
 
 namespace JobPortalApi.Services.User
@@ -30,13 +31,12 @@ namespace JobPortalApi.Services.User
             if (candidateProfile == null)
                 throw new Exception("Hồ sơ ứng viên chưa tồn tại.");
 
-            // Nếu CV không được truyền từ request => dùng CV trong profile nếu có
-            var cvUrl = request.CVUrl;
-            if (string.IsNullOrEmpty(cvUrl))
-                cvUrl = candidateProfile.ResumeUrl;
-
+            // CV chỉ lấy từ hồ sơ đã upload; không tin đường dẫn client gửi lên.
+            var cvUrl = candidateProfile.ResumeUrl;
             if (string.IsNullOrEmpty(cvUrl))
                 throw new Exception("Bạn cần tải lên CV trước khi ứng tuyển.");
+            if (PrivateCvStorage.Resolve(cvUrl) is not { } validPath || !File.Exists(validPath))
+                throw new InvalidOperationException("File CV không tồn tại, vui lòng tải lên lại.");
 
             var apply = new Job
             {

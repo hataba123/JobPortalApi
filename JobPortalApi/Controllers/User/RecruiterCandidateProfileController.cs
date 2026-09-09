@@ -30,7 +30,20 @@ namespace JobPortalApi.Controllers.User
         {
             var userId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
             var result = await _candidateService.GetByUserIdAsync(userId);
+            if (result?.ResumeUrl != null)
+                result.ResumeUrl = "/api/candidate-profile/me/cv";
             return result == null ? NotFound() : Ok(result);
+        }
+
+        [HttpGet("me/cv")]
+        [Authorize(Roles = "Candidate")]
+        public async Task<IActionResult> DownloadMyCv()
+        {
+            var userId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+            var file = await _candidateService.GetCvAsync(userId, userId);
+            return file == null
+                ? NotFound()
+                : File(file.Value.Content, "application/pdf", file.Value.FileName);
         }
 
         [HttpPut("me")]
@@ -50,6 +63,8 @@ namespace JobPortalApi.Controllers.User
         {
             var recruiterId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
             var result = await _candidateService.GetCandidateByIdAsync(recruiterId, id);
+            if (result?.ResumeUrl != null)
+                result.ResumeUrl = $"/api/candidate-profile/recruiter/{id}/cv";
             return result == null ? NotFound() : Ok(result);
         }
 
@@ -59,7 +74,23 @@ namespace JobPortalApi.Controllers.User
         {
             var recruiterId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
             var result = await _candidateService.GetCandidateApplicationsAsync(recruiterId, id);
+            foreach (var application in result)
+            {
+                if (!string.IsNullOrEmpty(application.CVUrl))
+                    application.CVUrl = $"/api/candidate-profile/recruiter/{id}/cv";
+            }
             return Ok(result);
+        }
+
+        [HttpGet("recruiter/{id}/cv")]
+        [Authorize(Roles = "Admin,Recruiter")]
+        public async Task<IActionResult> DownloadCandidateCv(Guid id)
+        {
+            var actorId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+            var file = await _candidateService.GetCvAsync(actorId, id, User.IsInRole("Admin"));
+            return file == null
+                ? NotFound()
+                : File(file.Value.Content, "application/pdf", file.Value.FileName);
         }
 
         [HttpGet("recruiter/search")]
@@ -84,8 +115,15 @@ namespace JobPortalApi.Controllers.User
         public async Task<IActionResult> UploadCV(IFormFile file)
         {
             var userId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
-            var url = await _candidateService.UploadCvAsync(userId, file);
-            return url != null ? Ok(new { url }) : NotFound("Không tìm thấy đơn ứng tuyển.");
+            try
+            {
+                var url = await _candidateService.UploadCvAsync(userId, file);
+                return url != null ? Ok(new { url }) : NotFound("Không tìm thấy hồ sơ ứng viên.");
+            }
+            catch (ArgumentException ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
         }
         [HttpDelete("me/delete-cv")]
         [Authorize(Roles = "Candidate")]

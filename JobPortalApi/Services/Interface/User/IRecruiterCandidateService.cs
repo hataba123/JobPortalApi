@@ -13,6 +13,7 @@ namespace JobPortalApi.Services.Interface.User
         Task<bool> UpdateAsync(Guid userId, CandidateProfileUpdateDto dto); // nếu controller cần
         Task<string?> UploadCvAsync(Guid userId, IFormFile file);
         Task<bool> DeleteCvAsync(Guid userId);
+        Task<(byte[] Content, string FileName)?> GetCvAsync(Guid actorId, Guid candidateId, bool isAdmin = false);
 
 
     }

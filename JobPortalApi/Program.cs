@@ -157,6 +157,15 @@ if (app.Environment.IsDevelopment())
         app.UseSwaggerUI();
     }
 // Hãy bật HTTPS nếu bạn dùng Swagger
+    app.Use(async (context, next) =>
+    {
+        if (context.Request.Path.StartsWithSegments("/uploads/cv"))
+        {
+            context.Response.StatusCode = StatusCodes.Status404NotFound;
+            return;
+        }
+        await next();
+    });
     app.UseStaticFiles(new StaticFileOptions
     {
         FileProvider = new PhysicalFileProvider(

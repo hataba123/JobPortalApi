@@ -2,6 +2,7 @@
 using JobPortalApi.DTOs.CandidateProfileDto;
 using JobPortalApi.Models;
 using JobPortalApi.Services.Interface.User;
+using JobPortalApi.Services.Helpers;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -62,6 +63,9 @@ namespace JobPortalApi.Services.User
 
         public async Task<CandidateProfileDetailDto?> GetCandidateByIdAsync(Guid recruiterId, Guid candidateId)
         {
+            var hasApplication = await _context.Jobs
+                .AnyAsync(j => j.CandidateId == candidateId && j.JobPost.EmployerId == recruiterId);
+            if (!hasApplication) return null;
             return await _context.candidateProfiles
                 .Include(c => c.User)
                 .Where(c => c.UserId == candidateId)
@@ -96,8 +100,7 @@ namespace JobPortalApi.Services.User
                     .ThenInclude(jp => jp.Company)
                 .Where(j =>
                     j.CandidateId == candidateId &&
-                    j.JobPost.Company != null &&
-                    j.JobPost.Company.UserId == recruiterId
+                    j.JobPost.EmployerId == recruiterId
                 )
                 .Select(j => new CandidateApplicationDto
                 {
@@ -117,8 +120,7 @@ namespace JobPortalApi.Services.User
                 .Include(j => j.JobPost)
                     .ThenInclude(jp => jp.Company)
                 .Where(j =>
-                    j.JobPost.Company != null &&
-                    j.JobPost.Company.UserId == recruiterId
+                    j.JobPost.EmployerId == recruiterId
                 )
                 .Select(j => j.CandidateId)
                 .Distinct()
@@ -180,7 +182,6 @@ namespace JobPortalApi.Services.User
             if (profile == null) return false;
             // Cập nhật các trường của CandidateProfile
 
-            profile.ResumeUrl = dto.ResumeUrl;
             profile.Experience = dto.Experience;
             profile.ExperienceYears = dto.ExperienceYears;
             profile.Skills = dto.Skills;
@@ -207,27 +208,33 @@ namespace JobPortalApi.Services.User
         public async Task<string?> UploadCvAsync(Guid userId, IFormFile file)
         {
             if (file == null || file.Length == 0) return null;
-
-            var fileName = $"{Guid.NewGuid()}_{file.FileName}";
-            var uploadPath = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "uploads", "cv");
-
-            if (!Directory.Exists(uploadPath))
-                Directory.CreateDirectory(uploadPath);
-
-            var filePath = Path.Combine(uploadPath, fileName);
-            await using (var stream = new FileStream(filePath, FileMode.Create))
-            {
-                await file.CopyToAsync(stream);
-            }
+            if (file.Length > 5 * 1024 * 1024)
+                throw new ArgumentException("File CV vượt quá dung lượng cho phép.");
 
             var profile = await _context.candidateProfiles.FirstOrDefaultAsync(p => p.UserId == userId);
             if (profile == null) return null;
 
-            profile.ResumeUrl = $"/uploads/cv/{fileName}";
+            await using var input = file.OpenReadStream();
+            await using var memory = new MemoryStream();
+            await input.CopyToAsync(memory);
+            var content = memory.ToArray();
+            PrivateCvStorage.ValidatePdf(file.FileName, file.Length, content);
+
+            Directory.CreateDirectory(PrivateCvStorage.RootDirectory);
+            var fileName = $"{Guid.NewGuid():D}.pdf";
+            var filePath = PrivateCvStorage.Resolve(fileName)
+                ?? throw new InvalidOperationException("Không tạo được đường dẫn CV an toàn.");
+            await System.IO.File.WriteAllBytesAsync(filePath, content);
+
+            var oldPath = PrivateCvStorage.Resolve(profile.ResumeUrl);
+            if (oldPath != null && System.IO.File.Exists(oldPath))
+                System.IO.File.Delete(oldPath);
+
+            profile.ResumeUrl = fileName;
             _context.candidateProfiles.Update(profile);
             await _context.SaveChangesAsync();
 
-            return profile.ResumeUrl;
+            return "/api/candidate-profile/me/cv";
         }
         public async Task<bool> DeleteCvAsync(Guid userId)
         {
@@ -235,8 +242,8 @@ namespace JobPortalApi.Services.User
             if (profile == null || string.IsNullOrEmpty(profile.ResumeUrl))
                 return false;
 
-            var filePath = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", profile.ResumeUrl.TrimStart('/'));
-            if (File.Exists(filePath))
+            var filePath = PrivateCvStorage.Resolve(profile.ResumeUrl);
+            if (filePath != null && File.Exists(filePath))
             {
                 File.Delete(filePath);
             }
@@ -246,6 +253,21 @@ namespace JobPortalApi.Services.User
             await _context.SaveChangesAsync();
 
             return true;
+        }
+
+        public async Task<(byte[] Content, string FileName)?> GetCvAsync(Guid actorId, Guid candidateId, bool isAdmin = false)
+        {
+            if (!isAdmin && !await _context.Jobs.AnyAsync(j =>
+                    j.CandidateId == candidateId && j.JobPost.EmployerId == actorId))
+                return null;
+
+            var storageKey = await _context.candidateProfiles
+                .Where(profile => profile.UserId == candidateId)
+                .Select(profile => profile.ResumeUrl)
+                .FirstOrDefaultAsync();
+            var path = PrivateCvStorage.Resolve(storageKey);
+            if (path == null || !File.Exists(path)) return null;
+            return (await File.ReadAllBytesAsync(path), "resume.pdf");
         }
 
 

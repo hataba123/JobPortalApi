@@ -34,6 +34,11 @@ namespace JobPortalApi.Controllers.User
         {
             var recruiterId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
             var result = await _applyService.GetCandidatesAppliedToJob(recruiterId, jobPostId);
+            foreach (var application in result)
+            {
+                if (!string.IsNullOrEmpty(application.CVUrl))
+                    application.CVUrl = $"/api/candidate-profile/recruiter/{application.CandidateId}/cv";
+            }
             return Ok(result);
         }
 
@@ -53,6 +58,11 @@ namespace JobPortalApi.Controllers.User
         public async Task<IActionResult> GetAll()
         {
             var result = await _applyService.GetAllAsync();
+            foreach (var application in result)
+            {
+                if (!string.IsNullOrEmpty(application.CVUrl))
+                    application.CVUrl = $"/api/candidate-profile/recruiter/{application.CandidateId}/cv";
+            }
             return Ok(result);
         }
 
@@ -64,6 +74,12 @@ namespace JobPortalApi.Controllers.User
             var userId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
             var result = await _applyService.GetByIdForUserAsync(id, userId, User.IsInRole("Admin"));
             if (result == null) return NotFound();
+            if (!string.IsNullOrEmpty(result.CVUrl))
+            {
+                result.CVUrl = User.IsInRole("Candidate")
+                    ? "/api/candidate-profile/me/cv"
+                    : $"/api/candidate-profile/recruiter/{result.CandidateId}/cv";
+            }
             return Ok(result);
         }
 
