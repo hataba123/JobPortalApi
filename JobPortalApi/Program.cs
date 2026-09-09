@@ -17,6 +17,7 @@ using System.Threading.RateLimiting;
 using JobPortalApi.Services.Matching;
 using JobPortalApi.Services.Payments;
 using JobPortalApi.Services.Notifications;
+using JobPortalApi.Services.Infrastructure;
 
 var builder = WebApplication.CreateBuilder(args);
 var jwtKey = builder.Configuration["Jwt:Key"];
@@ -183,6 +184,13 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     });
 
 var app = builder.Build();
+
+if (builder.Configuration.GetValue<bool>("Seed:Enabled") ||
+    string.Equals(Environment.GetEnvironmentVariable("SEED_DATABASE"), "true", StringComparison.OrdinalIgnoreCase))
+{
+    using var seedScope = app.Services.CreateScope();
+    await DatabaseSeeder.SeedAsync(seedScope.ServiceProvider, builder.Configuration);
+}
 
 
 // Configure the HTTP request pipeline.
