@@ -3,10 +3,12 @@ using JobPortalApi.DTOs.Payment;
 using JobPortalApi.Services.Payments;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 
 namespace JobPortalApi.Controllers.Payments;
 
 [ApiController]
+[EnableRateLimiting("payment")]
 [Route("api")]
 public class PaymentController : ControllerBase
 {

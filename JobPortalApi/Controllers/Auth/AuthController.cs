@@ -4,10 +4,12 @@ using JobPortalApi.DTOs.shared;
 using JobPortalApi.Services.Interface.User;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 
 namespace JobPortalApi.Controllers.Auth;
 
 [AllowAnonymous]
+[EnableRateLimiting("auth")]
 [Route("api/[controller]")]
 [ApiController]
 public class AuthController : ControllerBase

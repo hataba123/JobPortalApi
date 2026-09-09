@@ -13,6 +13,7 @@ using System.Security.Claims;
 using System.Text;
 using System.Diagnostics;
 using System.Text.Json.Serialization;
+using System.Threading.RateLimiting;
 using JobPortalApi.Services.Matching;
 using JobPortalApi.Services.Payments;
 
@@ -119,6 +120,28 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             };
         });
     builder.Services.AddAuthorization();
+    builder.Services.AddRateLimiter(options =>
+    {
+        options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+        options.AddPolicy("auth", context => RateLimitPartition.GetFixedWindowLimiter(
+            GetClientAddress(context),
+            _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 30,
+                Window = TimeSpan.FromMinutes(1),
+                QueueLimit = 0,
+                AutoReplenishment = true
+            }));
+        options.AddPolicy("payment", context => RateLimitPartition.GetFixedWindowLimiter(
+            GetClientAddress(context),
+            _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 60,
+                Window = TimeSpan.FromMinutes(1),
+                QueueLimit = 0,
+                AutoReplenishment = true
+            }));
+    });
 
     builder.Services.AddControllers()
         .AddJsonOptions(options =>
@@ -202,6 +225,7 @@ if (app.Environment.IsDevelopment())
     });
     app.UseCors("AllowFrontends"); // phải gọi trước UseAuthorization() 
     app.UseHttpsRedirection();
+    app.UseRateLimiter();
     app.UseAuthentication(); // 🛡 Bắt buộc đặt trước UseAuthorization
 
     app.UseAuthorization();
@@ -210,6 +234,9 @@ if (app.Environment.IsDevelopment())
 
     app.Run();
     Console.WriteLine("Environment: " + app.Environment.EnvironmentName);
+
+    static string GetClientAddress(HttpContext context) =>
+        context.Connection.RemoteIpAddress?.ToString() ?? "unknown";
 
 
 
