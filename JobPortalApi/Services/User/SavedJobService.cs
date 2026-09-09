@@ -1,6 +1,7 @@
 ﻿using JobPortalApi.DTOs.SavedJob;
 using JobPortalApi.Models;
 using JobPortalApi.Services.Interface.User;
+using JobPortalApi.Models.Enums;
 using Microsoft.EntityFrameworkCore;
 
 namespace JobPortalApi.Services.User
@@ -32,6 +33,13 @@ namespace JobPortalApi.Services.User
 
         public async Task SaveJobAsync(Guid userId, Guid jobPostId)
         {
+            var jobPost = await _context.JobPosts
+                .FirstOrDefaultAsync(j => j.Id == jobPostId &&
+                    j.Status == JobPostStatus.Active &&
+                    (!j.ExpiresAt.HasValue || j.ExpiresAt > DateTime.UtcNow));
+            if (jobPost == null)
+                throw new InvalidOperationException("Công việc không tồn tại hoặc đã hết hạn.");
+
             var exists = await _context.SavedJobs.AnyAsync(s => s.UserId == userId && s.JobPostId == jobPostId);
             if (exists) throw new Exception("Bạn đã lưu công việc này rồi.");
 
