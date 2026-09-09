@@ -59,6 +59,17 @@ public class ApplicationDbContext : DbContext
         // Nếu muốn map bảng Users cũng vậy
         modelBuilder.Entity<User>()
             .ToTable("Users");
+        modelBuilder.Entity<User>()
+            .HasQueryFilter(user => user.DeletedAt == null)
+            .HasIndex(user => user.DeletedAt);
+
+        modelBuilder.Entity<Company>()
+            .HasQueryFilter(company => company.DeletedAt == null)
+            .HasIndex(company => company.DeletedAt);
+
+        modelBuilder.Entity<JobPost>()
+            .HasQueryFilter(jobPost => jobPost.DeletedAt == null)
+            .HasIndex(jobPost => jobPost.DeletedAt);
 
         modelBuilder.Entity<OAuthAccount>()
             .HasIndex(a => new { a.Provider, a.ProviderAccountId })

@@ -128,7 +128,8 @@ namespace JobPortalApi.Services.User
                 .FirstOrDefaultAsync(j => j.Id == id && j.EmployerId == employerId);
             if (post == null) return false;
 
-            _context.JobPosts.Remove(post);
+            post.DeletedAt = DateTime.UtcNow;
+            post.Status = JobPostStatus.Closed;
             await _context.SaveChangesAsync();
             return true;
         }

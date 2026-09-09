@@ -80,7 +80,25 @@ namespace JobPortalApi.Services.Admin
         {
             var user = await _context.Users.FindAsync(id);
             if (user == null) return false;
-            _context.Users.Remove(user);
+            var deletedAt = DateTime.UtcNow;
+            user.DeletedAt = deletedAt;
+            user.PasswordVersion++;
+
+            var linkedPosts = await _context.JobPosts
+                .Where(job => job.EmployerId == id)
+                .ToListAsync();
+            foreach (var post in linkedPosts)
+            {
+                post.DeletedAt = deletedAt;
+                post.Status = Models.Enums.JobPostStatus.Closed;
+            }
+
+            var linkedCompanies = await _context.Companies
+                .Where(company => company.UserId == id)
+                .ToListAsync();
+            foreach (var company in linkedCompanies)
+                company.DeletedAt = deletedAt;
+
             await _context.SaveChangesAsync();
             return true;
         }

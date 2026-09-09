@@ -119,7 +119,8 @@ namespace JobPortalApi.Services.Admin
         {
             var j = await _context.JobPosts.FindAsync(id);
             if (j == null) return false;
-            _context.JobPosts.Remove(j);
+            j.DeletedAt = DateTime.UtcNow;
+            j.Status = JobPostStatus.Closed;
             await _context.SaveChangesAsync();
             return true;
         }

@@ -79,7 +79,7 @@ namespace JobPortalApi.Services.User
             var hasJobs = await _context.JobPosts.AnyAsync(j => j.CompanyId == company.Id);
             if (hasJobs) return false;
 
-            _context.Companies.Remove(company);
+            company.DeletedAt = DateTime.UtcNow;
             await _context.SaveChangesAsync();
             return true;
         }

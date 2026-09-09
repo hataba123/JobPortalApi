@@ -41,6 +41,7 @@ namespace JobPortalApi.Models
         public string Tags { get; set; } // Lưu dạng "tag1,tag2,tag3"
 
         public Guid? UserId { get; set; } // dùng nullable để tránh lỗi cascade
+        public DateTime? DeletedAt { get; set; }
 
 
     }

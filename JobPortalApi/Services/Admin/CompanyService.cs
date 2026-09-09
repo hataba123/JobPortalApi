@@ -1,5 +1,6 @@
 ﻿using JobPortalApi.DTOs.AdminCompany;
 using JobPortalApi.Models;
+using JobPortalApi.Models.Enums;
 using JobPortalApi.Services.Interface.Admin;
 using Microsoft.EntityFrameworkCore;
 
@@ -100,7 +101,15 @@ namespace JobPortalApi.Services.Admin
         {
             var c = await _context.Companies.FindAsync(id);
             if (c == null) return false;
-            _context.Companies.Remove(c);
+            c.DeletedAt = DateTime.UtcNow;
+            var linkedPosts = await _context.JobPosts
+                .Where(j => j.CompanyId == id)
+                .ToListAsync();
+            foreach (var post in linkedPosts)
+            {
+                post.DeletedAt = c.DeletedAt;
+                post.Status = JobPostStatus.Closed;
+            }
             await _context.SaveChangesAsync();
             return true;
         }
