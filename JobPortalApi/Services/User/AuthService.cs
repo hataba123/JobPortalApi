@@ -9,6 +9,7 @@ using JobPortalApi.DTOs.shared;
 using JobPortalApi.Services.Interface.User;
 using JobPortalApi.DTOs.Shared;
 using System.Security.Cryptography;
+using JobPortalApi.Services.Notifications;
 
 namespace JobPortalApi.Services.User
 {
@@ -18,16 +19,19 @@ namespace JobPortalApi.Services.User
         private readonly SecureJwtHelper _jwtHelper;
         private readonly IConfiguration _configuration;
         private readonly OAuthProviderVerifier _oauthProviderVerifier;
+        private readonly EmailNotificationService? _emailNotificationService;
 
         public AuthService(
             ApplicationDbContext context,
             IConfiguration configuration,
-            OAuthProviderVerifier oauthProviderVerifier)
+            OAuthProviderVerifier oauthProviderVerifier,
+            EmailNotificationService? emailNotificationService = null)
         {
             _context = context;
             _configuration = configuration;
             _jwtHelper = new SecureJwtHelper(configuration);
             _oauthProviderVerifier = oauthProviderVerifier;
+            _emailNotificationService = emailNotificationService;
         }
 
         // Đăng ký người dùng mới
@@ -196,7 +200,9 @@ namespace JobPortalApi.Services.User
                 ExpiresAt = now.AddMinutes(15)
             });
             await _context.SaveChangesAsync();
-            // Token chỉ được gửi qua email provider; không trả raw token về API.
+            // Chỉ gửi token qua provider; token thô không được lưu hoặc trả về API.
+            if (_emailNotificationService != null)
+                await _emailNotificationService.SendPasswordResetAsync(user.Email, rawToken);
         }
 
         public async Task ResetPasswordAsync(ResetPasswordRequest request)

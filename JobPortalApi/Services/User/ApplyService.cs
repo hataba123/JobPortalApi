@@ -6,6 +6,7 @@ using JobPortalApi.Services.Interface.Admin;
 using JobPortalApi.DTOs.Notification;
 using JobPortalApi.Services.Helpers;
 using Microsoft.EntityFrameworkCore;
+using JobPortalApi.Services.Notifications;
 
 namespace JobPortalApi.Services.User
 {
@@ -13,13 +14,16 @@ namespace JobPortalApi.Services.User
     {
         private readonly ApplicationDbContext _context;
         private readonly INotificationService _notificationService;
+        private readonly EmailNotificationService? _emailNotificationService;
 
         public ApplyService(
             ApplicationDbContext context,
-            INotificationService notificationService)
+            INotificationService notificationService,
+            EmailNotificationService? emailNotificationService = null)
         {
             _context = context;
             _notificationService = notificationService;
+            _emailNotificationService = emailNotificationService;
         }
 
         public async Task ApplyToJobAsync(Guid candidateId, JobApplicationRequest request)
@@ -76,6 +80,12 @@ namespace JobPortalApi.Services.User
                 Message = $"Đã nhận hồ sơ ứng tuyển cho tin \"{jobPost.Title}\".",
                 Type = "application_confirmation"
             });
+            var candidateEmail = await _context.Users
+                .Where(u => u.Id == candidateId)
+                .Select(u => u.Email)
+                .FirstOrDefaultAsync();
+            if (_emailNotificationService != null && !string.IsNullOrWhiteSpace(candidateEmail))
+                await _emailNotificationService.SendApplicationConfirmationAsync(candidateEmail, jobPost.Title);
         }
 
 
@@ -189,6 +199,7 @@ namespace JobPortalApi.Services.User
         {
             var apply = await _context.Jobs
                 .Include(j => j.JobPost)
+                .Include(j => j.Candidate)
                 .FirstOrDefaultAsync(j => j.Id == id);
             if (apply == null) return false;
             if (!isAdmin && apply.JobPost.EmployerId != actorId) return false;
@@ -205,6 +216,11 @@ namespace JobPortalApi.Services.User
                 Message = $"Trạng thái hồ sơ cho tin \"{apply.JobPost.Title}\" đã chuyển thành {newStatus}.",
                 Type = "application_status_changed"
             });
+            if (_emailNotificationService != null && !string.IsNullOrWhiteSpace(apply.Candidate?.Email))
+                await _emailNotificationService.SendApplicationStatusChangedAsync(
+                    apply.Candidate.Email,
+                    apply.JobPost.Title,
+                    newStatus.ToString());
             return true;
         }
 

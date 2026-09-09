@@ -16,6 +16,7 @@ using System.Text.Json.Serialization;
 using System.Threading.RateLimiting;
 using JobPortalApi.Services.Matching;
 using JobPortalApi.Services.Payments;
+using JobPortalApi.Services.Notifications;
 
 var builder = WebApplication.CreateBuilder(args);
 var jwtKey = builder.Configuration["Jwt:Key"];
@@ -43,6 +44,11 @@ builder.Services.AddHttpClient("oauth-provider", client =>
 {
     client.Timeout = TimeSpan.FromSeconds(5);
 });
+builder.Services.AddHttpClient("email-provider", client =>
+{
+    client.Timeout = TimeSpan.FromSeconds(5);
+});
+builder.Services.AddScoped<EmailNotificationService>();
 builder.Services.AddScoped<OAuthProviderVerifier>();
 builder.Services.AddScoped<IRecruiterCandidateService, RecruiterCandidateService>();
 builder.Services.AddScoped<ISavedJobService, SavedJobService>();
