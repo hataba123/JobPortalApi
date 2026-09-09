@@ -16,6 +16,8 @@ namespace JobPortalApi.DTOs.AdminJobPost
         public List<string> Tags { get; set; } = new List<string>();
         public int Applicants { get; set; }
         [Required] public DateTime CreatedAt { get; set; }
+        public DateTime? ExpiresAt { get; set; }
+        public JobPortalApi.Models.Enums.JobPostStatus? Status { get; set; }
         [Required] public Guid CategoryId { get; set; }
     }
 }

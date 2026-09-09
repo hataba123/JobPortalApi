@@ -1,5 +1,6 @@
 ﻿using JobPortalApi.DTOs.AdminJobPost;
 using JobPortalApi.Models;
+using JobPortalApi.Models.Enums;
 using JobPortalApi.Services.Interface.Admin;
 using Microsoft.EntityFrameworkCore;
 
@@ -29,6 +30,8 @@ namespace JobPortalApi.Services.Admin
                     Tags = j.Tags,
                     Applicants = j.Applicants,
                     CreatedAt = j.CreatedAt,
+                    ExpiresAt = j.ExpiresAt,
+                    Status = j.Status,
                     CategoryId = j.CategoryId
                 })
                 .ToListAsync();
@@ -53,6 +56,8 @@ namespace JobPortalApi.Services.Admin
                 Tags = j.Tags,
                 Applicants = j.Applicants,
                 CreatedAt = j.CreatedAt,
+                ExpiresAt = j.ExpiresAt,
+                Status = j.Status,
                 CategoryId = j.CategoryId
             };
         }
@@ -72,7 +77,9 @@ namespace JobPortalApi.Services.Admin
                 Type = dto.Type,
                 Tags = dto.Tags,
                 Applicants = dto.Applicants,
-                CreatedAt = dto.CreatedAt,
+                CreatedAt = dto.CreatedAt == default ? DateTime.UtcNow : dto.CreatedAt,
+                ExpiresAt = dto.ExpiresAt,
+                Status = dto.Status ?? JobPostStatus.Active,
                 CategoryId = dto.CategoryId
             };
             _context.JobPosts.Add(j);
@@ -96,6 +103,8 @@ namespace JobPortalApi.Services.Admin
             if (dto.Tags != null) j.Tags = dto.Tags;
             if (dto.Applicants.HasValue) j.Applicants = dto.Applicants.Value;
             if (dto.CreatedAt.HasValue) j.CreatedAt = dto.CreatedAt.Value;
+            if (dto.ExpiresAt.HasValue) j.ExpiresAt = dto.ExpiresAt.Value;
+            if (dto.Status.HasValue) j.Status = dto.Status.Value;
             if (dto.CategoryId.HasValue) j.CategoryId = dto.CategoryId.Value;
             _context.JobPosts.Update(j);
             await _context.SaveChangesAsync();

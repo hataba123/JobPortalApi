@@ -1,6 +1,7 @@
 ﻿using System;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
+using JobPortalApi.Models.Enums;
 
 namespace JobPortalApi.Models
 {
@@ -46,6 +47,11 @@ namespace JobPortalApi.Models
 
         [Required]
         public DateTime CreatedAt { get; set; }
+
+        public DateTime? ExpiresAt { get; set; }
+
+        [Required]
+        public JobPostStatus Status { get; set; } = JobPostStatus.Active;
 
         [Required]
         public Guid CategoryId { get; set; }

@@ -1,8 +1,8 @@
-﻿using JobPortalApi.DTOs.JobPost;
+using JobPortalApi.DTOs.JobPost;
 using JobPortalApi.Models;
+using JobPortalApi.Models.Enums;
 using JobPortalApi.Services.Interface.User;
 using Microsoft.EntityFrameworkCore;
-using System;
 
 namespace JobPortalApi.Services.User
 {
@@ -17,115 +17,35 @@ namespace JobPortalApi.Services.User
 
         public async Task<IEnumerable<JobPostDto>> GetAllAsync()
         {
-            return await _context.JobPosts
-                .Include(j => j.Category)
-                .Include(j => j.Company)
-                .Select(j => new JobPostDto
-                {
-                    Id = j.Id,
-                    Title = j.Title,
-                    Description = j.Description,
-                    Location = j.Location,
-                    Salary = j.Salary,
-                    Type = j.Type,
-                    Logo = j.Logo,
-                    Tags = j.Tags,
-                    CreatedAt = j.CreatedAt,
-                    CategoryName = j.Category.Name,
-                    CompanyName = j.Company != null ? j.Company.Name : ""
-                })
+            return await Project(ActivePosts(_context.JobPosts))
+                .OrderByDescending(j => j.CreatedAt)
                 .ToListAsync();
         }
 
         public async Task<JobPostDto?> GetByIdAsync(Guid id)
         {
-            return await _context.JobPosts
-                .Include(j => j.Category)
-                .Include(j => j.Company)
-                .Where(j => j.Id == id)
-                .Select(j => new JobPostDto
-                {
-                    Id = j.Id,
-                    Title = j.Title,
-                    Description = j.Description,
-                    Location = j.Location,
-                    Salary = j.Salary,
-                    Type = j.Type,
-                    Logo = j.Logo,
-                    Tags = j.Tags,
-                    CreatedAt = j.CreatedAt,
-                    CategoryName = j.Category.Name,
-                    CompanyName = j.Company != null ? j.Company.Name : ""
-                })
+            return await Project(ActivePosts(_context.JobPosts.Where(j => j.Id == id)))
                 .FirstOrDefaultAsync();
         }
+
         public async Task<IEnumerable<JobPostDto>> GetByCompanyIdAsync(Guid companyId)
         {
-            var jobPosts = await _context.JobPosts
-                .Where(j => j.CompanyId == companyId)
-                .Include(j => j.Category) // ✅ Load Category để tránh null
-                .Include(j => j.Company)  // ✅ Load Company nếu cần tên công ty
+            return await Project(ActivePosts(_context.JobPosts.Where(j => j.CompanyId == companyId)))
+                .OrderByDescending(j => j.CreatedAt)
                 .ToListAsync();
-
-            var jobPostDtos = jobPosts.Select(j => new JobPostDto
-            {
-                Id = j.Id,
-                Title = j.Title,
-                Description = j.Description,
-                Location = j.Location,
-                Salary = j.Salary,
-                Type = j.Type,
-                Logo = j.Logo,
-                Tags = j.Tags,
-                CreatedAt = j.CreatedAt,
-                CategoryName = j.Category != null ? j.Category.Name : "", // tránh null
-                CompanyName = j.Company != null ? j.Company.Name : ""
-            });
-
-            return jobPostDtos;
         }
+
         public async Task<IEnumerable<JobPostDto>> GetByCategoryIdAsync(Guid categoryId)
         {
-            var jobPosts = await _context.JobPosts
-                .Where(j => j.CategoryId == categoryId)
-                .Select(j => new JobPostDto
-                {
-                    Id = j.Id,
-                    Title = j.Title,
-                    Description = j.Description,
-                    Location = j.Location,
-                    Salary = j.Salary,
-                    Type = j.Type,
-                    Logo = j.Logo,
-                    Tags = j.Tags,
-                    CreatedAt = j.CreatedAt,
-                    CategoryName = j.Category.Name,
-                    CompanyName = j.Company != null ? j.Company.Name : ""
-                })
+            return await Project(ActivePosts(_context.JobPosts.Where(j => j.CategoryId == categoryId)))
+                .OrderByDescending(j => j.CreatedAt)
                 .ToListAsync();
-
-            return jobPosts;
         }
+
         public async Task<IEnumerable<JobPostDto>> GetByEmployerIdAsync(Guid employerId)
         {
-            return await _context.JobPosts
-                .Include(j => j.Category)
-                .Include(j => j.Company)
-                .Where(j => j.EmployerId == employerId)
-                .Select(j => new JobPostDto
-                {
-                    Id = j.Id,
-                    Title = j.Title,
-                    Description = j.Description,
-                    Location = j.Location,
-                    Salary = j.Salary,
-                    Type = j.Type,
-                    Logo = j.Logo,
-                    Tags = j.Tags,
-                    CreatedAt = j.CreatedAt,
-                    CategoryName = j.Category.Name,
-                    CompanyName = j.Company != null ? j.Company.Name : ""
-                })
+            return await Project(_context.JobPosts.Where(j => j.EmployerId == employerId))
+                .OrderByDescending(j => j.CreatedAt)
                 .ToListAsync();
         }
 
@@ -136,20 +56,25 @@ namespace JobPortalApi.Services.User
                 Id = Guid.NewGuid(),
                 Title = dto.Title,
                 Description = dto.Description,
+                SkillsRequired = dto.SkillsRequired,
                 Location = dto.Location,
                 Salary = dto.Salary,
                 Type = dto.Type,
                 Logo = dto.Logo,
-                Tags = dto.Tags,
+                Tags = dto.Tags ?? new List<string>(),
                 CreatedAt = DateTime.UtcNow,
+                ExpiresAt = dto.ExpiresAt,
+                Status = dto.Status ?? JobPostStatus.Active,
                 CategoryId = dto.CategoryId,
                 CompanyId = dto.CompanyId,
                 EmployerId = employerId
             };
+
             _context.JobPosts.Add(job);
             await _context.SaveChangesAsync();
 
-            return await GetByIdAsync(job.Id) ?? throw new Exception("Failed to retrieve created job post.");
+            return await GetForManagementAsync(job.Id)
+                ?? throw new InvalidOperationException("Không thể đọc lại tin tuyển dụng vừa tạo.");
         }
 
         public async Task<JobPostDto?> UpdateAsync(Guid id, UpdateJobPostDto dto, Guid employerId)
@@ -160,19 +85,20 @@ namespace JobPortalApi.Services.User
 
             job.Title = dto.Title;
             job.Description = dto.Description;
+            job.SkillsRequired = dto.SkillsRequired;
             job.Location = dto.Location;
             job.Salary = dto.Salary;
             job.Type = dto.Type;
             job.Logo = dto.Logo;
-            job.Tags = dto.Tags;
+            job.Tags = dto.Tags ?? new List<string>();
             job.CategoryId = dto.CategoryId;
             job.CompanyId = dto.CompanyId;
-            job.CreatedAt = DateTime.UtcNow;
+            job.ExpiresAt = dto.ExpiresAt;
+            if (dto.Status.HasValue)
+                job.Status = dto.Status.Value;
 
-            _context.JobPosts.Update(job);
             await _context.SaveChangesAsync();
-
-            return await GetByIdAsync(job.Id);
+            return await GetForManagementAsync(job.Id);
         }
 
         public async Task<bool> DeleteAsync(Guid id, Guid employerId)
@@ -184,6 +110,40 @@ namespace JobPortalApi.Services.User
             _context.JobPosts.Remove(post);
             await _context.SaveChangesAsync();
             return true;
+        }
+
+        private async Task<JobPostDto?> GetForManagementAsync(Guid id)
+        {
+            return await Project(_context.JobPosts.Where(j => j.Id == id))
+                .FirstOrDefaultAsync();
+        }
+
+        private static IQueryable<JobPost> ActivePosts(IQueryable<JobPost> query)
+        {
+            var now = DateTime.UtcNow;
+            return query.Where(j => j.Status == JobPostStatus.Active &&
+                (!j.ExpiresAt.HasValue || j.ExpiresAt > now));
+        }
+
+        private static IQueryable<JobPostDto> Project(IQueryable<JobPost> query)
+        {
+            return query.Select(j => new JobPostDto
+            {
+                Id = j.Id,
+                Title = j.Title,
+                Description = j.Description,
+                SkillsRequired = j.SkillsRequired,
+                Location = j.Location,
+                Salary = j.Salary,
+                Type = j.Type,
+                Logo = j.Logo,
+                Tags = j.Tags,
+                CreatedAt = j.CreatedAt,
+                ExpiresAt = j.ExpiresAt,
+                Status = j.Status,
+                CategoryName = j.Category != null ? j.Category.Name : "",
+                CompanyName = j.Company != null ? j.Company.Name : ""
+            });
         }
     }
 }

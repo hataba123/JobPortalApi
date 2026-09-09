@@ -20,6 +20,9 @@ namespace JobPortalApi.Services.User
             var jobPost = await _context.JobPosts.FindAsync(request.JobPostId);
             if (jobPost == null)
                 throw new Exception("Công việc không tồn tại.");
+            if (jobPost.Status != JobPostStatus.Active ||
+                (jobPost.ExpiresAt.HasValue && jobPost.ExpiresAt.Value <= DateTime.UtcNow))
+                throw new InvalidOperationException("Tin tuyển dụng không còn nhận hồ sơ.");
 
             // Tìm hồ sơ ứng viên
             var candidateProfile = await _context.candidateProfiles

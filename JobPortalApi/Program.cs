@@ -11,6 +11,7 @@ using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 using System.Security.Claims;
 using System.Text;
+using System.Text.Json.Serialization;
 
 var builder = WebApplication.CreateBuilder(args);
 var jwtKey = builder.Configuration["Jwt:Key"];
@@ -114,7 +115,9 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
         });
     builder.Services.AddAuthorization();
 
-    builder.Services.AddControllers();
+    builder.Services.AddControllers()
+        .AddJsonOptions(options =>
+            options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter()));
     // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
     builder.Services.AddEndpointsApiExplorer();
     builder.Services.AddSwaggerGen(options =>

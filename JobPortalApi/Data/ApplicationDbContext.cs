@@ -1,5 +1,6 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using JobPortalApi.Models;
+using JobPortalApi.Models.Enums;
 using System.Text.Json;
 using System.Security.Cryptography;
 
@@ -37,6 +38,9 @@ public class ApplicationDbContext : DbContext
         modelBuilder.Entity<JobPost>(entity =>
         {
             entity.ToTable("JobPosts");
+
+            entity.HasIndex(j => new { j.Status, j.ExpiresAt });
+            entity.Property(j => j.Status).HasDefaultValue(JobPostStatus.Active);
 
             entity.Property(e => e.Tags)
                 .HasConversion(
