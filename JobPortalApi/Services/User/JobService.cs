@@ -3,7 +3,6 @@ using JobPortalApi.Models;
 using JobPortalApi.Services.Interface.User;
 using Microsoft.EntityFrameworkCore;
 using System;
-using AutoMapper;
 
 namespace JobPortalApi.Services.User
 {
