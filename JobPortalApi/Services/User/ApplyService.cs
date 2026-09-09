@@ -2,6 +2,8 @@
 using JobPortalApi.DTOs.Apply;
 using JobPortalApi.Models.Enums;
 using JobPortalApi.Services.Interface.User;
+using JobPortalApi.Services.Interface.Admin;
+using JobPortalApi.DTOs.Notification;
 using JobPortalApi.Services.Helpers;
 using Microsoft.EntityFrameworkCore;
 
@@ -10,10 +12,14 @@ namespace JobPortalApi.Services.User
     public class ApplyService : IApplyService
     {
         private readonly ApplicationDbContext _context;
+        private readonly INotificationService _notificationService;
 
-        public ApplyService(ApplicationDbContext context)
+        public ApplyService(
+            ApplicationDbContext context,
+            INotificationService notificationService)
         {
             _context = context;
+            _notificationService = notificationService;
         }
 
         public async Task ApplyToJobAsync(Guid candidateId, JobApplicationRequest request)
@@ -57,6 +63,19 @@ namespace JobPortalApi.Services.User
             {
                 throw new InvalidOperationException("Bạn đã ứng tuyển công việc này rồi.");
             }
+
+            await _notificationService.CreateAsync(new CreateNotificationDto
+            {
+                UserId = jobPost.EmployerId,
+                Message = $"Có ứng viên mới cho tin \"{jobPost.Title}\".",
+                Type = "application_created"
+            });
+            await _notificationService.CreateAsync(new CreateNotificationDto
+            {
+                UserId = candidateId,
+                Message = $"Đã nhận hồ sơ ứng tuyển cho tin \"{jobPost.Title}\".",
+                Type = "application_confirmation"
+            });
         }
 
 
@@ -180,6 +199,12 @@ namespace JobPortalApi.Services.User
             apply.Status = newStatus;
             _context.Jobs.Update(apply);
             await _context.SaveChangesAsync();
+            await _notificationService.CreateAsync(new CreateNotificationDto
+            {
+                UserId = apply.CandidateId,
+                Message = $"Trạng thái hồ sơ cho tin \"{apply.JobPost.Title}\" đã chuyển thành {newStatus}.",
+                Type = "application_status_changed"
+            });
             return true;
         }
 
