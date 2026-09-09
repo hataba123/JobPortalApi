@@ -48,5 +48,14 @@ namespace JobPortalApi.Controllers.Admin
             var deleted = await _companyService.DeleteCompanyAsync(id);
             return deleted ? NoContent() : NotFound();
         }
+
+        [HttpPatch("{id}/verification")]
+        public async Task<IActionResult> UpdateVerification(
+            Guid id,
+            [FromBody] UpdateCompanyVerificationDto dto)
+        {
+            var company = await _companyService.UpdateVerificationStatusAsync(id, dto);
+            return company == null ? NotFound() : Ok(company);
+        }
     }
 }

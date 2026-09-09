@@ -31,7 +31,9 @@ namespace JobPortalApi.Services.Admin
                     Rating = c.Rating,
                     Website = c.Website,
                     Founded = c.Founded,
-                    Tags = c.Tags
+                    Tags = c.Tags,
+                    VerificationStatus = c.VerificationStatus,
+                    VerifiedAt = c.VerifiedAt
                 })
                 .ToListAsync();
         }
@@ -53,7 +55,9 @@ namespace JobPortalApi.Services.Admin
                 Rating = c.Rating,
                 Website = c.Website,
                 Founded = c.Founded,
-                Tags = c.Tags
+                Tags = c.Tags,
+                VerificationStatus = c.VerificationStatus,
+                VerifiedAt = c.VerifiedAt
             };
         }
 
@@ -112,6 +116,19 @@ namespace JobPortalApi.Services.Admin
             }
             await _context.SaveChangesAsync();
             return true;
+        }
+
+        public async Task<CompanyDto?> UpdateVerificationStatusAsync(Guid id, UpdateCompanyVerificationDto dto)
+        {
+            var company = await _context.Companies.FirstOrDefaultAsync(c => c.Id == id);
+            if (company == null) return null;
+
+            company.VerificationStatus = dto.VerificationStatus;
+            company.VerifiedAt = dto.VerificationStatus == CompanyVerificationStatus.Verified
+                ? DateTime.UtcNow
+                : null;
+            await _context.SaveChangesAsync();
+            return await GetCompanyByIdAsync(id);
         }
     }
 }

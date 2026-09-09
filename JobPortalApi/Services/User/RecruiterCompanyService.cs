@@ -1,6 +1,7 @@
 ﻿using JobPortalApi.DTOs.AdminCompany;
 using JobPortalApi.Services.Interface.User;
 using Microsoft.EntityFrameworkCore;
+using JobPortalApi.Models.Enums;
 
 namespace JobPortalApi.Services.User
 {
@@ -37,7 +38,9 @@ namespace JobPortalApi.Services.User
                 Rating = company.Rating,
                 Website = company.Website,
                 Founded = company.Founded,
-                Tags = company.Tags
+                Tags = company.Tags,
+                VerificationStatus = company.VerificationStatus,
+                VerifiedAt = company.VerifiedAt
             };
         }
 

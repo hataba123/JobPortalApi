@@ -66,6 +66,11 @@ public class ApplicationDbContext : DbContext
         modelBuilder.Entity<Company>()
             .HasQueryFilter(company => company.DeletedAt == null)
             .HasIndex(company => company.DeletedAt);
+        modelBuilder.Entity<Company>()
+            .Property(company => company.VerificationStatus)
+            .HasDefaultValue(CompanyVerificationStatus.Pending);
+        modelBuilder.Entity<Company>()
+            .HasIndex(company => company.VerificationStatus);
 
         modelBuilder.Entity<JobPost>()
             .HasQueryFilter(jobPost => jobPost.DeletedAt == null)

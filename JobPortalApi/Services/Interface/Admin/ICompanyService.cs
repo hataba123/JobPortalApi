@@ -9,5 +9,6 @@ namespace JobPortalApi.Services.Interface.Admin
         Task<CompanyDto> CreateCompanyAsync(CreateCompanyDto dto);
         Task<bool> UpdateCompanyAsync(Guid id, UpdateCompanyDto dto);
         Task<bool> DeleteCompanyAsync(Guid id);
+        Task<CompanyDto?> UpdateVerificationStatusAsync(Guid id, UpdateCompanyVerificationDto dto);
     }
 }

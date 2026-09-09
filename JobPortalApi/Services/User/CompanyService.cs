@@ -2,6 +2,7 @@
 using JobPortalApi.Services.Interface.User;
 using Microsoft.EntityFrameworkCore;
 using JobPortalApi.Models;
+using JobPortalApi.Models.Enums;
 
 namespace JobPortalApi.Services.User
 
@@ -18,6 +19,7 @@ namespace JobPortalApi.Services.User
         public async Task<IEnumerable<CompanyDto>> GetAllAsync()
         {
             return await _context.Companies
+                .Where(c => c.VerificationStatus == CompanyVerificationStatus.Verified)
                 .Select(c => new CompanyDto
                 {
                     Id = c.Id,
@@ -31,7 +33,9 @@ namespace JobPortalApi.Services.User
                     Rating = c.Rating,
                     Website = c.Website,
                     Founded = c.Founded,
-                    Tags = c.Tags
+                    Tags = c.Tags,
+                    VerificationStatus = c.VerificationStatus,
+                    VerifiedAt = c.VerifiedAt
                 })
                 .ToListAsync();
         }
@@ -40,6 +44,7 @@ namespace JobPortalApi.Services.User
         {
             return await _context.Companies
                 .Where(c => c.Id == id)
+                .Where(c => c.VerificationStatus == CompanyVerificationStatus.Verified)
                 .Select(c => new CompanyDto
                 {
                     Id = c.Id,
@@ -53,7 +58,9 @@ namespace JobPortalApi.Services.User
                     Rating = c.Rating,
                     Website = c.Website,
                     Founded = c.Founded,
-                    Tags = c.Tags
+                    Tags = c.Tags,
+                    VerificationStatus = c.VerificationStatus,
+                    VerifiedAt = c.VerifiedAt
                 })
                 .FirstOrDefaultAsync();
         }

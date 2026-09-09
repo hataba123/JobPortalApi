@@ -1,5 +1,6 @@
 ﻿using System.ComponentModel.DataAnnotations.Schema;
 using System.ComponentModel.DataAnnotations;
+using JobPortalApi.Models.Enums;
 
 namespace JobPortalApi.Models
 {
@@ -42,6 +43,8 @@ namespace JobPortalApi.Models
 
         public Guid? UserId { get; set; } // dùng nullable để tránh lỗi cascade
         public DateTime? DeletedAt { get; set; }
+        public CompanyVerificationStatus VerificationStatus { get; set; } = CompanyVerificationStatus.Pending;
+        public DateTime? VerifiedAt { get; set; }
 
 
     }

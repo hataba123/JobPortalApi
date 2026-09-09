@@ -14,5 +14,7 @@
         public string Website { get; set; }
         public string Founded { get; set; }
         public string Tags { get; set; }
+        public JobPortalApi.Models.Enums.CompanyVerificationStatus VerificationStatus { get; set; }
+        public DateTime? VerifiedAt { get; set; }
     }
 }
