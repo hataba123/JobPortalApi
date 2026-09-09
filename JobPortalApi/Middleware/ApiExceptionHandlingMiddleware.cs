@@ -35,6 +35,7 @@ namespace JobPortalApi.Middleware
                 UnauthorizedAccessException => StatusCodes.Status401Unauthorized,
                 ArgumentException => StatusCodes.Status400BadRequest,
                 InvalidOperationException => StatusCodes.Status400BadRequest,
+                ApiConflictException => StatusCodes.Status409Conflict,
                 DbUpdateException => StatusCodes.Status409Conflict,
                 _ => StatusCodes.Status500InternalServerError
             };

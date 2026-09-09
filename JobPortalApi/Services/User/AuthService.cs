@@ -10,6 +10,7 @@ using JobPortalApi.Services.Interface.User;
 using JobPortalApi.DTOs.Shared;
 using System.Security.Cryptography;
 using JobPortalApi.Services.Notifications;
+using JobPortalApi.Middleware;
 
 namespace JobPortalApi.Services.User
 {
@@ -37,13 +38,13 @@ namespace JobPortalApi.Services.User
         // Đăng ký người dùng mới
         public async Task<string> RegisterAsync(RegisterRequest request)
         {
-            if (request.Role == UserRole.Admin)
-                throw new InvalidOperationException("Không thể đăng ký công khai với vai trò Admin.");
+            if (request.Role != UserRole.Candidate && request.Role != UserRole.Recruiter)
+                throw new InvalidOperationException("Vai trò đăng ký không hợp lệ.");
 
             // Kiểm tra email đã tồn tại chưa
             var existingUser = await _context.Users.FirstOrDefaultAsync(u => u.Email == request.Email);
             if (existingUser != null)
-                throw new Exception("Email đã được sử dụng.");
+                throw new ApiConflictException("Email đã được sử dụng.");
 
             // Tạo user mới với mật khẩu mã hoá
             var user = new Models.User
@@ -93,10 +94,10 @@ namespace JobPortalApi.Services.User
 
             // Nếu không tìm thấy hoặc mật khẩu sai thì báo lỗi
             if (user == null)
-                throw new Exception("Tài khoản không tồn tại.");
+                throw new InvalidOperationException("Email hoặc mật khẩu không đúng.");
 
             if (!VerifyPassword(request.Password, user.PasswordHash))
-                throw new Exception("Email hoặc mật khẩu không đúng.");
+                throw new InvalidOperationException("Email hoặc mật khẩu không đúng.");
             // Trả về JWT token
             return _jwtHelper.GenerateJwtToken(user); // ✅ Gọi helper
         }
