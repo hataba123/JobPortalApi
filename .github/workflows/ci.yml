@@ -1,0 +1,22 @@
+name: ASP.NET Core CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+      - run: dotnet restore JobPortalApi.sln
+      - run: dotnet build JobPortalApi.sln --no-restore --configuration Release --warnaserror false
+      - run: dotnet test JobPortalApi.sln --no-build --configuration Release
+      - name: Vulnerable package report
+        continue-on-error: true
+        run: dotnet list JobPortalApi/JobPortalApi.csproj package --vulnerable --include-transitive

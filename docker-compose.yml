@@ -1,0 +1,35 @@
+services:
+  sqlserver:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    environment:
+      ACCEPT_EULA: "Y"
+      MSSQL_PID: ${MSSQL_PID:-Developer}
+      MSSQL_SA_PASSWORD: ${MSSQL_SA_PASSWORD:?Set MSSQL_SA_PASSWORD in the environment}
+    ports:
+      - "1433:1433"
+    volumes:
+      - sqlserver-data:/var/opt/mssql
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -P \"$${MSSQL_SA_PASSWORD}\" -Q \"SELECT 1\" || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+
+  api:
+    build: .
+    ports:
+      - "8080:8080"
+    environment:
+      ConnectionStrings__DefaultConnection: Server=sqlserver,1433;Database=JobPortal;User Id=sa;Password=${MSSQL_SA_PASSWORD};TrustServerCertificate=True;MultipleActiveResultSets=True
+      Jwt__Key: ${JWT_KEY:?Set JWT_KEY in the environment}
+      Jwt__Issuer: ${JWT_ISSUER:-JobPortal}
+      Jwt__Audience: ${JWT_AUDIENCE:-JobPortalClient}
+      Vnpay__TmnCode: ${VNPAY_TMN_CODE:-sandbox}
+      Vnpay__HashSecret: ${VNPAY_HASH_SECRET:-sandbox-secret}
+      Vnpay__ReturnUrl: ${VNPAY_RETURN_URL:-http://localhost:3000/vi/payment/return}
+    depends_on:
+      sqlserver:
+        condition: service_healthy
+
+volumes:
+  sqlserver-data:
