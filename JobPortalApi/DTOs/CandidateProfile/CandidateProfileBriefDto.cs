@@ -9,6 +9,10 @@ namespace JobPortalApi.DTOs.CandidateProfileDto
         public string FullName { get; set; }
         public string? Skills { get; set; }
         public string? Experience { get; set; }
+        public int? ExperienceYears { get; set; }
         public string? Education { get; set; }
+        public string? PreferredLocation { get; set; }
+        public string? PreferredJobType { get; set; }
+        public decimal? ExpectedSalary { get; set; }
     }
 }

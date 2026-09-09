@@ -52,7 +52,11 @@ namespace JobPortalApi.Services.User
                 FullName = c.User.FullName,
                 Skills = c.Skills,
                 Experience = c.Experience,
-                Education = c.Education
+                ExperienceYears = c.ExperienceYears,
+                Education = c.Education,
+                PreferredLocation = c.PreferredLocation,
+                PreferredJobType = c.PreferredJobType,
+                ExpectedSalary = c.ExpectedSalary
             }).ToListAsync();
         }
 
@@ -68,8 +72,12 @@ namespace JobPortalApi.Services.User
                     FullName = c.User.FullName,
                     ResumeUrl = c.ResumeUrl,
                     Experience = c.Experience,
+                    ExperienceYears = c.ExperienceYears,
                     Skills = c.Skills,
                     Education = c.Education,
+                    PreferredLocation = c.PreferredLocation,
+                    PreferredJobType = c.PreferredJobType,
+                    ExpectedSalary = c.ExpectedSalary,
                     Dob = c.Dob,
                     Gender = c.Gender,
                     PortfolioUrl = c.PortfolioUrl,
@@ -126,7 +134,11 @@ namespace JobPortalApi.Services.User
                     FullName = c.User.FullName,
                     Skills = c.Skills,
                     Experience = c.Experience,
-                    Education = c.Education
+                    ExperienceYears = c.ExperienceYears,
+                    Education = c.Education,
+                    PreferredLocation = c.PreferredLocation,
+                    PreferredJobType = c.PreferredJobType,
+                    ExpectedSalary = c.ExpectedSalary
                 }).ToListAsync();
         }
 
@@ -142,8 +154,12 @@ namespace JobPortalApi.Services.User
                     FullName = c.User.FullName,
                     ResumeUrl = c.ResumeUrl,
                     Experience = c.Experience,
+                    ExperienceYears = c.ExperienceYears,
                     Skills = c.Skills,
                     Education = c.Education,
+                    PreferredLocation = c.PreferredLocation,
+                    PreferredJobType = c.PreferredJobType,
+                    ExpectedSalary = c.ExpectedSalary,
                     Dob = c.Dob,
                     Gender = c.Gender,
                     PortfolioUrl = c.PortfolioUrl,
@@ -166,8 +182,12 @@ namespace JobPortalApi.Services.User
 
             profile.ResumeUrl = dto.ResumeUrl;
             profile.Experience = dto.Experience;
+            profile.ExperienceYears = dto.ExperienceYears;
             profile.Skills = dto.Skills;
             profile.Education = dto.Education;
+            profile.PreferredLocation = dto.PreferredLocation;
+            profile.PreferredJobType = dto.PreferredJobType;
+            profile.ExpectedSalary = dto.ExpectedSalary;
             profile.Dob = dto.Dob;
             profile.Gender = dto.Gender;
             profile.PortfolioUrl = dto.PortfolioUrl;

@@ -21,11 +21,22 @@ namespace JobPortalApi.Models
         [MaxLength(1000)]
         public string? Experience { get; set; }
 
+        public int? ExperienceYears { get; set; }
+
         [MaxLength(500)]
         public string? Skills { get; set; } // "skill1,skill2"
 
         [MaxLength(200)]
         public string? Education { get; set; }
+
+        [MaxLength(200)]
+        public string? PreferredLocation { get; set; }
+
+        [MaxLength(100)]
+        public string? PreferredJobType { get; set; }
+
+        [Column(TypeName = "decimal(18,2)")]
+        public decimal? ExpectedSalary { get; set; }
 
         public DateTime? Dob { get; set; }
 

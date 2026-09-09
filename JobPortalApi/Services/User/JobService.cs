@@ -65,6 +65,8 @@ namespace JobPortalApi.Services.User
                 CreatedAt = DateTime.UtcNow,
                 ExpiresAt = dto.ExpiresAt,
                 Status = dto.Status ?? JobPostStatus.Active,
+                MinExperienceYears = dto.MinExperienceYears,
+                EducationRequirement = dto.EducationRequirement,
                 CategoryId = dto.CategoryId,
                 CompanyId = dto.CompanyId,
                 EmployerId = employerId
@@ -94,6 +96,10 @@ namespace JobPortalApi.Services.User
             job.CategoryId = dto.CategoryId;
             job.CompanyId = dto.CompanyId;
             job.ExpiresAt = dto.ExpiresAt;
+            if (dto.MinExperienceYears.HasValue)
+                job.MinExperienceYears = dto.MinExperienceYears.Value;
+            if (dto.EducationRequirement != null)
+                job.EducationRequirement = dto.EducationRequirement;
             if (dto.Status.HasValue)
                 job.Status = dto.Status.Value;
 
@@ -141,6 +147,8 @@ namespace JobPortalApi.Services.User
                 CreatedAt = j.CreatedAt,
                 ExpiresAt = j.ExpiresAt,
                 Status = j.Status,
+                MinExperienceYears = j.MinExperienceYears,
+                EducationRequirement = j.EducationRequirement,
                 CategoryName = j.Category != null ? j.Category.Name : "",
                 CompanyName = j.Company != null ? j.Company.Name : ""
             });

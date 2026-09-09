@@ -12,6 +12,7 @@ using Microsoft.OpenApi.Models;
 using System.Security.Claims;
 using System.Text;
 using System.Text.Json.Serialization;
+using JobPortalApi.Services.Matching;
 
 var builder = WebApplication.CreateBuilder(args);
 var jwtKey = builder.Configuration["Jwt:Key"];
@@ -43,6 +44,7 @@ builder.Services.AddScoped<JobPortalApi.Services.Interface.User.ICompanyService,
 builder.Services.AddScoped<IJobService, JobService>();
 
 builder.Services.AddScoped<IApplyService, ApplyService>();
+builder.Services.AddScoped<MatchingService>();
 // add db context
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection"),

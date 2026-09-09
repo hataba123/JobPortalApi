@@ -53,6 +53,11 @@ namespace JobPortalApi.Models
         [Required]
         public JobPostStatus Status { get; set; } = JobPostStatus.Active;
 
+        public int? MinExperienceYears { get; set; }
+
+        [MaxLength(200)]
+        public string? EducationRequirement { get; set; }
+
         [Required]
         public Guid CategoryId { get; set; }
         [ForeignKey(nameof(CategoryId))]

@@ -32,6 +32,8 @@ namespace JobPortalApi.Services.Admin
                     CreatedAt = j.CreatedAt,
                     ExpiresAt = j.ExpiresAt,
                     Status = j.Status,
+                    MinExperienceYears = j.MinExperienceYears,
+                    EducationRequirement = j.EducationRequirement,
                     CategoryId = j.CategoryId
                 })
                 .ToListAsync();
@@ -58,6 +60,8 @@ namespace JobPortalApi.Services.Admin
                 CreatedAt = j.CreatedAt,
                 ExpiresAt = j.ExpiresAt,
                 Status = j.Status,
+                MinExperienceYears = j.MinExperienceYears,
+                EducationRequirement = j.EducationRequirement,
                 CategoryId = j.CategoryId
             };
         }

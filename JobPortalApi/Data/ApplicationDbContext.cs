@@ -27,6 +27,7 @@ public class ApplicationDbContext : DbContext
     public DbSet<Notification> Notifications { get; set; } // Thêm DbSet<Notification> nếu có
     public DbSet<OAuthAccount> OAuthAccounts { get; set; }
     public DbSet<PasswordResetToken> PasswordResetTokens { get; set; }
+    public DbSet<MatchResult> MatchResults { get; set; }
 
     public DbSet<Review> Review { get; set; } // Thêm DbSet<Review> nếu có
 
@@ -97,6 +98,24 @@ public class ApplicationDbContext : DbContext
         modelBuilder.Entity<SavedJob>()
             .HasIndex(s => new { s.UserId, s.JobPostId })
             .IsUnique();
+
+        modelBuilder.Entity<MatchResult>()
+            .HasIndex(m => new { m.CandidateId, m.JobPostId })
+            .IsUnique();
+        modelBuilder.Entity<MatchResult>()
+            .HasIndex(m => new { m.JobPostId, m.TotalScore });
+        modelBuilder.Entity<MatchResult>()
+            .HasIndex(m => new { m.CandidateId, m.TotalScore });
+        modelBuilder.Entity<MatchResult>()
+            .HasOne(m => m.Candidate)
+            .WithMany()
+            .HasForeignKey(m => m.CandidateId)
+            .OnDelete(DeleteBehavior.Restrict);
+        modelBuilder.Entity<MatchResult>()
+            .HasOne(m => m.JobPost)
+            .WithMany()
+            .HasForeignKey(m => m.JobPostId)
+            .OnDelete(DeleteBehavior.Cascade);
         base.OnModelCreating(modelBuilder);
 
     }

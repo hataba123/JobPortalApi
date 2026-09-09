@@ -17,6 +17,8 @@
         public DateTime CreatedAt { get; set; }
         public DateTime? ExpiresAt { get; set; }
         public JobPortalApi.Models.Enums.JobPostStatus Status { get; set; }
+        public int? MinExperienceYears { get; set; }
+        public string? EducationRequirement { get; set; }
         public Guid CategoryId { get; set; }
     }
 }
