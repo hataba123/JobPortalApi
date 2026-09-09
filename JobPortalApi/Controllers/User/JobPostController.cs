@@ -63,7 +63,7 @@ namespace JobPortalApi.Controllers.User
         {
             var recruiterId = Guid.Parse(User.FindFirst(ClaimTypes.NameIdentifier)!.Value);
             var created = await _jobService.CreateAsync(dto, recruiterId);
-            return CreatedAtAction(nameof(GetById), new { id = created.Id }, created);
+            return Ok(created);
         }
 
         [HttpPut("{id}")]
@@ -83,7 +83,7 @@ namespace JobPortalApi.Controllers.User
             var recruiterId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
             var success = await _jobService.DeleteAsync(id, recruiterId);
             if (!success) return NotFound();
-            return NoContent();
+            return Ok(new { message = "Đã xóa mềm tin." });
         }
     }
 }
