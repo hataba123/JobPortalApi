@@ -66,6 +66,11 @@ namespace JobPortalApi.Services.User
 
         public async Task<JobPostDto> CreateAsync(CreateJobPostDto dto, Guid employerId)
         {
+            var requestedStatus = dto.Status ?? JobPostStatus.PendingApproval;
+            if (requestedStatus != JobPostStatus.Draft &&
+                requestedStatus != JobPostStatus.PendingApproval)
+                throw new ArgumentException("Recruiter chỉ được tạo tin ở trạng thái Draft hoặc PendingApproval.");
+
             var job = new JobPost
             {
                 Id = Guid.NewGuid(),
@@ -79,7 +84,7 @@ namespace JobPortalApi.Services.User
                 Tags = dto.Tags ?? new List<string>(),
                 CreatedAt = DateTime.UtcNow,
                 ExpiresAt = dto.ExpiresAt,
-                Status = dto.Status ?? JobPostStatus.Active,
+                Status = requestedStatus,
                 MinExperienceYears = dto.MinExperienceYears,
                 EducationRequirement = dto.EducationRequirement,
                 CategoryId = dto.CategoryId,
