@@ -9,12 +9,15 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.FileProviders;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
+using System.Security.Claims;
 using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
 var jwtKey = builder.Configuration["Jwt:Key"];
 var jwtIssuer = builder.Configuration["Jwt:Issuer"];
 var jwtAudience = builder.Configuration["Jwt:Audience"];
+if (string.IsNullOrWhiteSpace(jwtKey) || string.IsNullOrWhiteSpace(jwtIssuer))
+    throw new InvalidOperationException("Jwt:Key và Jwt:Issuer là bắt buộc.");
 
 // Add services to the container.
 // Admin services
@@ -81,8 +84,32 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
                 ValidateIssuerSigningKey = true,
                 ValidIssuer = jwtIssuer,
                 IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey)),
-                   // 🔥 Quan trọng: map đúng claim role
-            RoleClaimType = "http://schemas.microsoft.com/ws/2008/06/identity/claims/role",
+                // 🔥 Quan trọng: map đúng claim role
+                RoleClaimType = "http://schemas.microsoft.com/ws/2008/06/identity/claims/role",
+            };
+            options.Events = new JwtBearerEvents
+            {
+                OnTokenValidated = async context =>
+                {
+                    var userIdValue = context.Principal?.FindFirstValue(ClaimTypes.NameIdentifier);
+                    var versionValue = context.Principal?.FindFirst("pwd_ver")?.Value;
+                    // Token phát hành trước migration không có version; cho phép đến khi hết hạn.
+                    if (versionValue == null) return;
+                    if (!Guid.TryParse(userIdValue, out var userId) ||
+                        !int.TryParse(versionValue, out var tokenVersion))
+                    {
+                        context.Fail("Token không hợp lệ.");
+                        return;
+                    }
+
+                    var db = context.HttpContext.RequestServices.GetRequiredService<ApplicationDbContext>();
+                    var currentVersion = await db.Users
+                        .Where(u => u.Id == userId)
+                        .Select(u => (int?)u.PasswordVersion)
+                        .SingleOrDefaultAsync();
+                    if (currentVersion == null || currentVersion.Value != tokenVersion)
+                        context.Fail("Phiên đăng nhập đã hết hạn.");
+                }
             };
         });
     builder.Services.AddAuthorization();

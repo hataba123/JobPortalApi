@@ -60,6 +60,22 @@ namespace JobPortalApi.Services.Admin
                 .FirstOrDefaultAsync();
         }
 
+        public async Task<NotificationDto?> GetByIdAsync(Guid id, Guid userId)
+        {
+            return await _context.Notifications
+                .Where(n => n.Id == id && n.UserId == userId)
+                .Select(n => new NotificationDto
+                {
+                    Id = n.Id,
+                    UserId = n.UserId,
+                    Message = n.Message,
+                    CreatedAt = n.CreatedAt,
+                    Read = n.Read,
+                    Type = n.Type
+                })
+                .FirstOrDefaultAsync();
+        }
+
         public async Task<NotificationDto> CreateAsync(CreateNotificationDto dto)
         {
             var notification = new Notification
@@ -95,6 +111,14 @@ namespace JobPortalApi.Services.Admin
             await _context.SaveChangesAsync();
             return true;
         }
+
+        public async Task<bool> MarkAsReadAsync(Guid id, Guid userId)
+        {
+            var updated = await _context.Notifications
+                .Where(n => n.Id == id && n.UserId == userId)
+                .ExecuteUpdateAsync(setters => setters.SetProperty(n => n.Read, true));
+            return updated == 1;
+        }
         public async Task<bool> DeleteAsync(Guid id)
         {
             var notification = await _context.Notifications.FindAsync(id);
@@ -103,6 +127,14 @@ namespace JobPortalApi.Services.Admin
             _context.Notifications.Remove(notification);
             await _context.SaveChangesAsync();
             return true;
+        }
+
+        public async Task<bool> DeleteAsync(Guid id, Guid userId)
+        {
+            var deleted = await _context.Notifications
+                .Where(n => n.Id == id && n.UserId == userId)
+                .ExecuteDeleteAsync();
+            return deleted == 1;
         }
 
     }

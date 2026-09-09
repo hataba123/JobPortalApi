@@ -24,6 +24,8 @@ public class ApplicationDbContext : DbContext
     public DbSet<Category> Categories { get; set; } // Thêm DbSet<Category> nếu có
     public DbSet<CandidateProfile> candidateProfiles { get; set; } // Thêm DbSet<CategoryProfile> nếu có
     public DbSet<Notification> Notifications { get; set; } // Thêm DbSet<Notification> nếu có
+    public DbSet<OAuthAccount> OAuthAccounts { get; set; }
+    public DbSet<PasswordResetToken> PasswordResetTokens { get; set; }
 
     public DbSet<Review> Review { get; set; } // Thêm DbSet<Review> nếu có
 
@@ -49,6 +51,14 @@ public class ApplicationDbContext : DbContext
         modelBuilder.Entity<User>()
             .ToTable("Users");
 
+        modelBuilder.Entity<OAuthAccount>()
+            .HasIndex(a => new { a.Provider, a.ProviderAccountId })
+            .IsUnique();
+
+        modelBuilder.Entity<PasswordResetToken>()
+            .HasIndex(t => t.TokenHash)
+            .IsUnique();
+
         modelBuilder.Entity<Job>()
                .ToTable("Jobs"); // Map Job thành bảng Applies
         modelBuilder.Entity<Job>()
@@ -63,6 +73,9 @@ public class ApplicationDbContext : DbContext
             .WithMany()
             .HasForeignKey(a => a.CandidateId)
             .OnDelete(DeleteBehavior.Restrict); // FIX lỗi cascade bằng cách không cascade ở đây
+        modelBuilder.Entity<Job>()
+            .HasIndex(a => new { a.CandidateId, a.JobPostId })
+            .IsUnique();
         modelBuilder.Entity<SavedJob>()
     .ToTable("SavedJobs");
 
@@ -77,6 +90,9 @@ public class ApplicationDbContext : DbContext
             .WithMany()
             .HasForeignKey(s => s.JobPostId)
             .OnDelete(DeleteBehavior.Cascade); // Cái này OK vì không tạo vòng lặp
+        modelBuilder.Entity<SavedJob>()
+            .HasIndex(s => new { s.UserId, s.JobPostId })
+            .IsUnique();
         base.OnModelCreating(modelBuilder);
 
     }

@@ -34,7 +34,8 @@ namespace JobPortalApi.Controllers.User
         [HttpGet("{id}")]
         public async Task<IActionResult> GetById(Guid id)
         {
-            var result = await _notificationService.GetByIdAsync(id);
+            var userId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+            var result = await _notificationService.GetByIdAsync(id, userId);
             return result == null ? NotFound() : Ok(result);
         }
 
@@ -43,7 +44,8 @@ namespace JobPortalApi.Controllers.User
         [HttpPut("{id}/read")]
         public async Task<IActionResult> MarkAsRead(Guid id)
         {
-            var success = await _notificationService.MarkAsReadAsync(id);
+            var userId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+            var success = await _notificationService.MarkAsReadAsync(id, userId);
             return success ? Ok(new { message = "Thông báo đã được đánh dấu là đã đọc." }) : NotFound();
         }
 
@@ -52,7 +54,8 @@ namespace JobPortalApi.Controllers.User
         [HttpDelete("{id}")]
         public async Task<IActionResult> Delete(Guid id)
         {
-            var success = await _notificationService.DeleteAsync(id);
+            var userId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+            var success = await _notificationService.DeleteAsync(id, userId);
             return success ? Ok(new { message = "Xoá thông báo thành công." }) : NotFound();
         }
     }

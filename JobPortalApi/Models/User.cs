@@ -20,6 +20,7 @@ namespace JobPortalApi.Models
         /// Full name of the user.
         public string FullName { get; set; }
         public DateTime CreatedAt { get; set; } // ✅ Dòng này phải tồn tại
+        public int PasswordVersion { get; set; }
 
 
         /// Role assigned to the user (Admin, Recruiter, or Candidate).

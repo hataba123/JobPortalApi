@@ -11,7 +11,8 @@ namespace JobPortalApi.Services.Interface.User
             // CRUD mở rộng
             Task<List<ApplyDto>> GetAllAsync();
             Task<ApplyDto?> GetByIdAsync(Guid id);
-            Task<bool> UpdateStatusAsync(Guid id, string status); // Update status (Accepted/Rejected...)
+            Task<ApplyDto?> GetByIdForUserAsync(Guid id, Guid userId, bool isAdmin);
+            Task<bool> UpdateStatusAsync(Guid id, string status, Guid actorId, bool isAdmin); // Update status (Accepted/Rejected...)
             Task<bool> DeleteAsync(Guid id);
         }
 }

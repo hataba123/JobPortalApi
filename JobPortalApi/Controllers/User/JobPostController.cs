@@ -68,7 +68,8 @@ namespace JobPortalApi.Controllers.User
         [Authorize(Roles = "Recruiter")]
         public async Task<IActionResult> Update(Guid id, UpdateJobPostDto dto)
         {
-            var updated = await _jobService.UpdateAsync(id, dto);
+            var recruiterId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+            var updated = await _jobService.UpdateAsync(id, dto, recruiterId);
             if (updated == null) return NotFound();
             return Ok(updated);
         }
@@ -77,7 +78,8 @@ namespace JobPortalApi.Controllers.User
         [Authorize(Roles = "Recruiter")]
         public async Task<IActionResult> Delete(Guid id)
         {
-            var success = await _jobService.DeleteAsync(id);
+            var recruiterId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+            var success = await _jobService.DeleteAsync(id, recruiterId);
             if (!success) return NotFound();
             return NoContent();
         }

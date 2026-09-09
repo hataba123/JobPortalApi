@@ -9,10 +9,10 @@ namespace JobPortalApi.Services.Interface.User
         Task<JobPostDto?> GetByIdAsync(Guid id);
         Task<IEnumerable<JobPostDto>> GetByEmployerIdAsync(Guid employerId);
         Task<JobPostDto> CreateAsync(CreateJobPostDto dto, Guid employerId);
-        Task<JobPostDto?> UpdateAsync(Guid id, UpdateJobPostDto dto);
+        Task<JobPostDto?> UpdateAsync(Guid id, UpdateJobPostDto dto, Guid employerId);
         Task<IEnumerable<JobPostDto>> GetByCompanyIdAsync(Guid companyId);
 
-        Task<bool> DeleteAsync(Guid id);
+        Task<bool> DeleteAsync(Guid id, Guid employerId);
         Task<IEnumerable<JobPostDto>> GetByCategoryIdAsync(Guid categoryId);
 
     }

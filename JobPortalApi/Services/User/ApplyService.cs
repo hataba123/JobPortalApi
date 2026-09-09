@@ -46,7 +46,14 @@ namespace JobPortalApi.Services.User
             };
 
             _context.Jobs.Add(apply);
-            await _context.SaveChangesAsync();
+            try
+            {
+                await _context.SaveChangesAsync();
+            }
+            catch (DbUpdateException)
+            {
+                throw new InvalidOperationException("Bạn đã ứng tuyển công việc này rồi.");
+            }
         }
 
 
@@ -134,10 +141,35 @@ namespace JobPortalApi.Services.User
                 .FirstOrDefaultAsync();
         }
 
-        public async Task<bool> UpdateStatusAsync(Guid id, string status)
+        public async Task<ApplyDto?> GetByIdForUserAsync(Guid id, Guid userId, bool isAdmin)
         {
-            var apply = await _context.Jobs.FindAsync(id);
+            IQueryable<Job> query = _context.Jobs
+                .Include(j => j.JobPost)
+                .Include(j => j.Candidate)
+                .Where(j => j.Id == id);
+            if (!isAdmin)
+                query = query.Where(j => j.CandidateId == userId);
+
+            return await query.Select(j => new ApplyDto
+            {
+                Id = j.Id,
+                CandidateId = j.CandidateId,
+                CandidateName = j.Candidate.FullName,
+                JobPostId = j.JobPostId,
+                JobTitle = j.JobPost.Title,
+                CVUrl = j.CVUrl,
+                Status = j.Status.ToString(),
+                AppliedAt = j.AppliedAt
+            }).FirstOrDefaultAsync();
+        }
+
+        public async Task<bool> UpdateStatusAsync(Guid id, string status, Guid actorId, bool isAdmin)
+        {
+            var apply = await _context.Jobs
+                .Include(j => j.JobPost)
+                .FirstOrDefaultAsync(j => j.Id == id);
             if (apply == null) return false;
+            if (!isAdmin && apply.JobPost.EmployerId != actorId) return false;
 
             if (!Enum.TryParse<ApplyStatus>(status, out var newStatus))
                 throw new Exception("Trạng thái không hợp lệ.");

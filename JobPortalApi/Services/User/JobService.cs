@@ -153,9 +153,10 @@ namespace JobPortalApi.Services.User
             return await GetByIdAsync(job.Id) ?? throw new Exception("Failed to retrieve created job post.");
         }
 
-        public async Task<JobPostDto?> UpdateAsync(Guid id, UpdateJobPostDto dto)
+        public async Task<JobPostDto?> UpdateAsync(Guid id, UpdateJobPostDto dto, Guid employerId)
         {
-            var job = await _context.JobPosts.FindAsync(id);
+            var job = await _context.JobPosts
+                .FirstOrDefaultAsync(j => j.Id == id && j.EmployerId == employerId);
             if (job == null) return null;
 
             job.Title = dto.Title;
@@ -175,9 +176,10 @@ namespace JobPortalApi.Services.User
             return await GetByIdAsync(job.Id);
         }
 
-        public async Task<bool> DeleteAsync(Guid id)
+        public async Task<bool> DeleteAsync(Guid id, Guid employerId)
         {
-            var post = await _context.JobPosts.FindAsync(id);
+            var post = await _context.JobPosts
+                .FirstOrDefaultAsync(j => j.Id == id && j.EmployerId == employerId);
             if (post == null) return false;
 
             _context.JobPosts.Remove(post);

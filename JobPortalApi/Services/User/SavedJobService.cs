@@ -44,7 +44,14 @@ namespace JobPortalApi.Services.User
             };
 
             _context.SavedJobs.Add(savedJob);
-            await _context.SaveChangesAsync();
+            try
+            {
+                await _context.SaveChangesAsync();
+            }
+            catch (DbUpdateException)
+            {
+                throw new InvalidOperationException("Bạn đã lưu công việc này rồi.");
+            }
         }
 
         public async Task<bool> UnsaveJobAsync(Guid userId, Guid jobPostId)

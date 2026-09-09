@@ -61,7 +61,8 @@ namespace JobPortalApi.Controllers.User
         [Authorize(Roles = "Admin,Candidate")]
         public async Task<IActionResult> GetById(Guid id)
         {
-            var result = await _applyService.GetByIdAsync(id);
+            var userId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+            var result = await _applyService.GetByIdForUserAsync(id, userId, User.IsInRole("Admin"));
             if (result == null) return NotFound();
             return Ok(result);
         }
@@ -71,7 +72,8 @@ namespace JobPortalApi.Controllers.User
         [Authorize(Roles = "Admin,Recruiter")]
         public async Task<IActionResult> UpdateStatus(Guid id, [FromBody] UpdateApplyStatusRequest request)
         {
-            var success = await _applyService.UpdateStatusAsync(id, request.Status);
+            var actorId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+            var success = await _applyService.UpdateStatusAsync(id, request.Status, actorId, User.IsInRole("Admin"));
             if (!success) return NotFound();
             return Ok(new { message = "Cập nhật trạng thái thành công." });
         }
