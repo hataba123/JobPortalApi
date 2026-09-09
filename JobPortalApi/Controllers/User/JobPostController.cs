@@ -20,9 +20,11 @@ namespace JobPortalApi.Controllers.User
         }
 
         [HttpGet]
-        public async Task<IActionResult> GetAll()
+        public async Task<IActionResult> GetAll([FromQuery] int page = 1, [FromQuery] int pageSize = 20)
         {
-            var posts = await _jobService.GetAllAsync();
+            if (page < 1 || pageSize < 1 || pageSize > 100)
+                return BadRequest(new { message = "page phải >= 1 và pageSize phải trong khoảng 1-100." });
+            var posts = await _jobService.GetAllAsync(page, pageSize);
             return Ok(posts);
         }
         [HttpGet("company/{companyId}")]

@@ -1,4 +1,5 @@
 using JobPortalApi.DTOs.JobPost;
+using JobPortalApi.DTOs.Shared;
 using JobPortalApi.Models;
 using JobPortalApi.Models.Enums;
 using JobPortalApi.Services.Interface.User;
@@ -15,11 +16,25 @@ namespace JobPortalApi.Services.User
             _context = context;
         }
 
-        public async Task<IEnumerable<JobPostDto>> GetAllAsync()
+        public async Task<PagedResponse<JobPostDto>> GetAllAsync(int page = 1, int pageSize = 20)
         {
-            return await Project(ActivePosts(_context.JobPosts))
+            page = Math.Max(1, page);
+            pageSize = Math.Clamp(pageSize, 1, 100);
+            var query = ActivePosts(_context.JobPosts);
+            var total = await query.CountAsync();
+            var items = await Project(query)
                 .OrderByDescending(j => j.CreatedAt)
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
                 .ToListAsync();
+            return new PagedResponse<JobPostDto>
+            {
+                Items = items,
+                Total = total,
+                Page = page,
+                PageSize = pageSize,
+                TotalPages = (int)Math.Ceiling(total / (double)pageSize)
+            };
         }
 
         public async Task<JobPostDto?> GetByIdAsync(Guid id)
