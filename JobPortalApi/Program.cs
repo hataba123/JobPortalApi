@@ -11,6 +11,7 @@ using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 using System.Security.Claims;
 using System.Text;
+using System.Diagnostics;
 using System.Text.Json.Serialization;
 using JobPortalApi.Services.Matching;
 using JobPortalApi.Services.Payments;
@@ -147,7 +148,7 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
         });
     });
 
-    var app = builder.Build();
+var app = builder.Build();
 
 
 // Configure the HTTP request pipeline.
@@ -156,6 +157,33 @@ if (app.Environment.IsDevelopment())
         app.UseSwagger();
         app.UseSwaggerUI();
     }
+    app.Use(async (context, next) =>
+    {
+        const string headerName = "X-Correlation-ID";
+        var supplied = context.Request.Headers[headerName].FirstOrDefault();
+        var correlationId = Guid.TryParse(supplied, out var parsed)
+            ? parsed.ToString("D")
+            : Guid.NewGuid().ToString("D");
+        context.TraceIdentifier = correlationId;
+        context.Response.Headers[headerName] = correlationId;
+
+        var logger = context.RequestServices
+            .GetRequiredService<ILoggerFactory>()
+            .CreateLogger("RequestPipeline");
+        var started = Stopwatch.GetTimestamp();
+        logger.LogInformation("Request started {Method} {Path} {CorrelationId}",
+            context.Request.Method, context.Request.Path, correlationId);
+        try
+        {
+            await next();
+        }
+        finally
+        {
+            var elapsed = Stopwatch.GetElapsedTime(started).TotalMilliseconds;
+            logger.LogInformation("Request completed {StatusCode} {ElapsedMs} {CorrelationId}",
+                context.Response.StatusCode, elapsed, correlationId);
+        }
+    });
 // Hãy bật HTTPS nếu bạn dùng Swagger
     app.Use(async (context, next) =>
     {
