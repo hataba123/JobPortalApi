@@ -389,7 +389,7 @@ public enum ApplyStatus
 ```json
 {
   "ConnectionStrings": {
-    "DefaultConnection": "Server=DESKTOP-8CRV363\\SQLEXPRESS;Database=JobPortal;Trusted_Connection=True;TrustServerCertificate=True;"
+    "DefaultConnection": "Server=localhost;Database=JobPortal;Trusted_Connection=True;TrustServerCertificate=True;"
   }
 }
 ```
@@ -399,7 +399,7 @@ public enum ApplyStatus
 ```json
 {
   "Jwt": {
-    "Key": "abcdefghijklmnopqrstuvwxyz123456",
+    "Key": "<configure via user-secrets or Jwt__Key environment variable>",
     "Issuer": "JobPortalAPI"
   }
 }
