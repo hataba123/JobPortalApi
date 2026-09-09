@@ -25,32 +25,18 @@ public class AuthController : ControllerBase
     [ProducesResponseType(typeof(AuthResponse), StatusCodes.Status200OK)]
     public async Task<IActionResult> Register([FromBody] RegisterRequest request)
     {
-        try
-        {
-            var token = await _authService.RegisterAsync(request);
-            var user = await _authService.GetUserByEmailAsync(request.Email);
-            return Ok(new AuthResponse { Token = token, User = user });
-        }
-        catch (Exception ex)
-        {
-            return BadRequest(ex.Message);
-        }
+        var token = await _authService.RegisterAsync(request);
+        var user = await _authService.GetUserByEmailAsync(request.Email);
+        return Ok(new AuthResponse { Token = token, User = user });
     }
 
     [HttpPost("login")]
     [ProducesResponseType(typeof(AuthResponse), StatusCodes.Status200OK)]
     public async Task<IActionResult> Login([FromBody] LoginRequest request)
     {
-        try
-        {
-            var token = await _authService.LoginAsync(request);
-            var user = await _authService.GetUserByEmailAsync(request.Email);
-            return Ok(new AuthResponse { Token = token, User = user });
-        }
-        catch (Exception ex)
-        {
-            return BadRequest(ex.Message);
-        }
+        var token = await _authService.LoginAsync(request);
+        var user = await _authService.GetUserByEmailAsync(request.Email);
+        return Ok(new AuthResponse { Token = token, User = user });
     }
 
     [HttpGet("me")]
@@ -69,18 +55,7 @@ public class AuthController : ControllerBase
         [FromBody] OAuthLoginRequest request,
         [FromHeader(Name = "X-OAuth-Exchange-Secret")] string exchangeSecret)
     {
-        try
-        {
-            return Ok(await _authService.OAuthLoginAsync(request, exchangeSecret ?? string.Empty));
-        }
-        catch (UnauthorizedAccessException ex)
-        {
-            return Unauthorized(ex.Message);
-        }
-        catch (Exception ex)
-        {
-            return BadRequest(ex.Message);
-        }
+        return Ok(await _authService.OAuthLoginAsync(request, exchangeSecret ?? string.Empty));
     }
 
     [HttpPost("change-password")]
