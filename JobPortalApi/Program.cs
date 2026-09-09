@@ -5,6 +5,7 @@ using JobPortalApi.Services.Interface.User;
 using JobPortalApi.Services.User;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.FileProviders;
 using Microsoft.IdentityModel.Tokens;
@@ -18,6 +19,7 @@ using JobPortalApi.Services.Matching;
 using JobPortalApi.Services.Payments;
 using JobPortalApi.Services.Notifications;
 using JobPortalApi.Services.Infrastructure;
+using JobPortalApi.Middleware;
 
 var builder = WebApplication.CreateBuilder(args);
 var jwtKey = builder.Configuration["Jwt:Key"];
@@ -155,6 +157,25 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             }));
     });
 
+    builder.Services.Configure<ApiBehaviorOptions>(options =>
+    {
+        options.InvalidModelStateResponseFactory = context =>
+        {
+            var errors = context.ModelState
+                .Where(item => item.Value?.Errors.Count > 0)
+                .ToDictionary(
+                    item => item.Key,
+                    item => item.Value!.Errors.Select(error => error.ErrorMessage).ToArray());
+            return new BadRequestObjectResult(new
+            {
+                statusCode = StatusCodes.Status400BadRequest,
+                code = "VALIDATION_ERROR",
+                message = "Dữ liệu không hợp lệ.",
+                traceId = context.HttpContext.TraceIdentifier,
+                details = errors
+            });
+        };
+    });
     builder.Services.AddControllers()
         .AddJsonOptions(options =>
             options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter()));
@@ -191,6 +212,8 @@ if (builder.Configuration.GetValue<bool>("Seed:Enabled") ||
     using var seedScope = app.Services.CreateScope();
     await DatabaseSeeder.SeedAsync(seedScope.ServiceProvider, builder.Configuration);
 }
+
+app.UseMiddleware<ApiExceptionHandlingMiddleware>();
 
 
 // Configure the HTTP request pipeline.
