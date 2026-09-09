@@ -73,6 +73,10 @@ public class AuthController : ControllerBase
         {
             return Ok(await _authService.OAuthLoginAsync(request, exchangeSecret ?? string.Empty));
         }
+        catch (UnauthorizedAccessException ex)
+        {
+            return Unauthorized(ex.Message);
+        }
         catch (Exception ex)
         {
             return BadRequest(ex.Message);
