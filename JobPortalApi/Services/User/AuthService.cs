@@ -17,12 +17,17 @@ namespace JobPortalApi.Services.User
         private readonly ApplicationDbContext _context;
         private readonly SecureJwtHelper _jwtHelper;
         private readonly IConfiguration _configuration;
+        private readonly OAuthProviderVerifier _oauthProviderVerifier;
 
-        public AuthService(ApplicationDbContext context, IConfiguration configuration)
+        public AuthService(
+            ApplicationDbContext context,
+            IConfiguration configuration,
+            OAuthProviderVerifier oauthProviderVerifier)
         {
             _context = context;
             _configuration = configuration;
             _jwtHelper = new SecureJwtHelper(configuration);
+            _oauthProviderVerifier = oauthProviderVerifier;
         }
 
         // Đăng ký người dùng mới
@@ -101,38 +106,44 @@ namespace JobPortalApi.Services.User
             if (string.IsNullOrWhiteSpace(expectedSecret) || exchangeSecret != expectedSecret)
                 throw new UnauthorizedAccessException("OAuth exchange không hợp lệ.");
 
+            var identity = await _oauthProviderVerifier.VerifyAsync(
+                request.Provider,
+                request.AccessToken);
+
             var account = await _context.OAuthAccounts
                 .Include(a => a.User)
                 .FirstOrDefaultAsync(a =>
-                    a.Provider == request.Provider &&
-                    a.ProviderAccountId == request.ProviderAccountId);
+                    a.Provider == identity.Provider &&
+                    a.ProviderAccountId == identity.ProviderAccountId);
 
             Models.User user;
             if (account != null)
             {
                 user = account.User;
+                if (user.DeletedAt.HasValue)
+                    throw new UnauthorizedAccessException("Tài khoản đã bị vô hiệu hóa.");
             }
             else
             {
                 var existingUser = await _context.Users
-                    .FirstOrDefaultAsync(u => u.Email == request.Email);
+                    .FirstOrDefaultAsync(u => u.Email == identity.Email);
                 if (existingUser != null)
                     throw new InvalidOperationException("Email đã tồn tại. Hãy đăng nhập bằng mật khẩu trước khi liên kết OAuth.");
 
                 user = new Models.User
                 {
                     Id = Guid.NewGuid(),
-                    Email = request.Email,
-                    FullName = request.Name,
+                    Email = identity.Email,
+                    FullName = identity.Name,
                     Role = UserRole.Candidate,
-                    PasswordHash = HashPassword($"oauth:{request.Provider}:{request.ProviderAccountId}:{Guid.NewGuid()}")
+                    PasswordHash = HashPassword($"oauth:{identity.Provider}:{identity.ProviderAccountId}:{Guid.NewGuid()}")
                 };
                 _context.Users.Add(user);
                 _context.OAuthAccounts.Add(new OAuthAccount
                 {
                     UserId = user.Id,
-                    Provider = request.Provider,
-                    ProviderAccountId = request.ProviderAccountId
+                    Provider = identity.Provider,
+                    ProviderAccountId = identity.ProviderAccountId
                 });
                 _context.candidateProfiles.Add(new CandidateProfile
                 {

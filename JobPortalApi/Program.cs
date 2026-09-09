@@ -39,6 +39,11 @@ builder.Services.AddScoped<IDashboardService, DashboardService>();
 builder.Services.AddScoped<IPasswordHasher<User>, PasswordHasher<User>>();
 
 builder.Services.AddScoped<IAuthService, AuthService>();
+builder.Services.AddHttpClient("oauth-provider", client =>
+{
+    client.Timeout = TimeSpan.FromSeconds(5);
+});
+builder.Services.AddScoped<OAuthProviderVerifier>();
 builder.Services.AddScoped<IRecruiterCandidateService, RecruiterCandidateService>();
 builder.Services.AddScoped<ISavedJobService, SavedJobService>();
 builder.Services.AddScoped<JobPortalApi.Services.Interface.User.IReviewService, JobPortalApi.Services.User.ReviewService>();
