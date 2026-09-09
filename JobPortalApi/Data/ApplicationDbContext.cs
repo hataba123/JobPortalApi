@@ -28,6 +28,10 @@ public class ApplicationDbContext : DbContext
     public DbSet<OAuthAccount> OAuthAccounts { get; set; }
     public DbSet<PasswordResetToken> PasswordResetTokens { get; set; }
     public DbSet<MatchResult> MatchResults { get; set; }
+    public DbSet<ServicePlan> ServicePlans { get; set; }
+    public DbSet<PlanEntitlement> PlanEntitlements { get; set; }
+    public DbSet<PaymentOrder> PaymentOrders { get; set; }
+    public DbSet<CreditLedger> CreditLedgers { get; set; }
 
     public DbSet<Review> Review { get; set; } // Thêm DbSet<Review> nếu có
 
@@ -116,6 +120,49 @@ public class ApplicationDbContext : DbContext
             .WithMany()
             .HasForeignKey(m => m.JobPostId)
             .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity<PlanEntitlement>()
+            .HasIndex(item => new { item.PlanId, item.CreditType })
+            .IsUnique();
+        modelBuilder.Entity<PlanEntitlement>()
+            .HasOne(item => item.Plan)
+            .WithMany(plan => plan.Entitlements)
+            .HasForeignKey(item => item.PlanId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity<PaymentOrder>()
+            .HasIndex(order => order.VnpTxnRef)
+            .IsUnique();
+        modelBuilder.Entity<PaymentOrder>()
+            .HasIndex(order => new { order.UserId, order.CreatedAt });
+        modelBuilder.Entity<PaymentOrder>()
+            .HasIndex(order => new { order.Status, order.ExpiresAt });
+        modelBuilder.Entity<PaymentOrder>()
+            .HasOne(order => order.User)
+            .WithMany()
+            .HasForeignKey(order => order.UserId)
+            .OnDelete(DeleteBehavior.Restrict);
+        modelBuilder.Entity<PaymentOrder>()
+            .HasOne(order => order.Plan)
+            .WithMany(plan => plan.PaymentOrders)
+            .HasForeignKey(order => order.PlanId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        modelBuilder.Entity<CreditLedger>()
+            .HasIndex(entry => new { entry.PaymentOrderId, entry.CreditType })
+            .IsUnique();
+        modelBuilder.Entity<CreditLedger>()
+            .HasIndex(entry => new { entry.UserId, entry.CreditType, entry.ExpiresAt });
+        modelBuilder.Entity<CreditLedger>()
+            .HasOne(entry => entry.User)
+            .WithMany()
+            .HasForeignKey(entry => entry.UserId)
+            .OnDelete(DeleteBehavior.Restrict);
+        modelBuilder.Entity<CreditLedger>()
+            .HasOne(entry => entry.PaymentOrder)
+            .WithMany(order => order.CreditLedger)
+            .HasForeignKey(entry => entry.PaymentOrderId)
+            .OnDelete(DeleteBehavior.Restrict);
         base.OnModelCreating(modelBuilder);
 
     }
