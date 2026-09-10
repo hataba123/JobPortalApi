@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -10,9 +11,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace JobPortalApi.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260910092045_SeniorDataIntegrity")]
+    partial class SeniorDataIntegrity
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -547,24 +550,14 @@ namespace JobPortalApi.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uniqueidentifier");
 
-                    b.Property<Guid?>("ActorId")
-                        .HasColumnType("uniqueidentifier");
-
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime2");
 
                     b.Property<int>("CreditType")
                         .HasColumnType("int");
 
-                    b.Property<int>("EntryType")
-                        .HasColumnType("int");
-
                     b.Property<DateTime?>("ExpiresAt")
                         .HasColumnType("datetime2");
-
-                    b.Property<string>("IdempotencyKey")
-                        .HasMaxLength(200)
-                        .HasColumnType("nvarchar(200)");
 
                     b.Property<Guid?>("PaymentOrderId")
                         .HasColumnType("uniqueidentifier");
@@ -572,24 +565,10 @@ namespace JobPortalApi.Migrations
                     b.Property<int>("Quantity")
                         .HasColumnType("int");
 
-                    b.Property<string>("Reason")
-                        .HasMaxLength(500)
-                        .HasColumnType("nvarchar(500)");
-
-                    b.Property<string>("SourceIdempotencyKey")
-                        .HasMaxLength(200)
-                        .HasColumnType("nvarchar(200)");
-
                     b.Property<Guid>("UserId")
                         .HasColumnType("uniqueidentifier");
 
                     b.HasKey("Id");
-
-                    b.HasIndex("IdempotencyKey")
-                        .IsUnique()
-                        .HasFilter("[IdempotencyKey] IS NOT NULL");
-
-                    b.HasIndex("SourceIdempotencyKey");
 
                     b.HasIndex("PaymentOrderId", "CreditType")
                         .IsUnique()
@@ -1073,9 +1052,6 @@ namespace JobPortalApi.Migrations
                         .HasMaxLength(10)
                         .HasColumnType("nvarchar(10)");
 
-                    b.Property<string>("EntitlementsSnapshot")
-                        .HasColumnType("nvarchar(max)");
-
                     b.Property<DateTime>("ExpiresAt")
                         .HasColumnType("datetime2");
 
@@ -1084,13 +1060,6 @@ namespace JobPortalApi.Migrations
 
                     b.Property<Guid>("PlanId")
                         .HasColumnType("uniqueidentifier");
-
-                    b.Property<string>("PlanNameSnapshot")
-                        .HasMaxLength(120)
-                        .HasColumnType("nvarchar(120)");
-
-                    b.Property<decimal?>("PriceSnapshot")
-                        .HasColumnType("decimal(18,2)");
 
                     b.Property<string>("ProviderResponseCode")
                         .HasMaxLength(10)
@@ -1102,10 +1071,6 @@ namespace JobPortalApi.Migrations
                     b.Property<Guid>("UserId")
                         .HasColumnType("uniqueidentifier");
 
-                    b.Property<string>("VnpTransactionNo")
-                        .HasMaxLength(64)
-                        .HasColumnType("nvarchar(64)");
-
                     b.Property<string>("VnpTxnRef")
                         .IsRequired()
                         .HasMaxLength(64)
@@ -1114,10 +1079,6 @@ namespace JobPortalApi.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("PlanId");
-
-                    b.HasIndex("VnpTransactionNo")
-                        .IsUnique()
-                        .HasFilter("[VnpTransactionNo] IS NOT NULL");
 
                     b.HasIndex("VnpTxnRef")
                         .IsUnique();
@@ -1258,15 +1219,9 @@ namespace JobPortalApi.Migrations
                         .IsRequired()
                         .HasColumnType("nvarchar(450)");
 
-                    b.Property<int>("FailedLoginAttempts")
-                        .HasColumnType("int");
-
                     b.Property<string>("FullName")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
-
-                    b.Property<DateTime?>("LockoutUntil")
-                        .HasColumnType("datetime2");
 
                     b.Property<string>("PasswordHash")
                         .IsRequired()
