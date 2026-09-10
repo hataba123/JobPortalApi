@@ -54,6 +54,9 @@ namespace JobPortalApi.Services.Infrastructure
             company.Industry = "Công nghệ thông tin";
             company.OpenJobs = 1;
             company.Rating = 5;
+            company.Website = "https://jobportal.local";
+            company.Founded = "2024";
+            company.Tags = "JobPortal,Recruitment,Technology";
             company.UserId = RecruiterId;
             company.DeletedAt = null;
             company.VerificationStatus = CompanyVerificationStatus.Verified;
