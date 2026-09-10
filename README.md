@@ -1,6 +1,6 @@
 # JobPortal API (ASP.NET Core)
 
-API backend ASP.NET Core của JobPortal, sử dụng SQL Server và Entity Framework Core. Repository này là một service độc lập, có controller, service, DTO và migration riêng; frontend có thể kết nối tới API thông qua `BACKEND_API_URL` khi các contract tương thích.
+API backend canonical của JobPortal, sử dụng ASP.NET Core 8, SQL Server và Entity Framework Core. Kiến trúc chính là modular monolith. Frontend Next.js kết nối qua BFF tới API này; NestJS/PostgreSQL được giữ như implementation legacy/reference và không nhận feature mới.
 
 | Thông tin | Giá trị |
 | --- | --- |
@@ -21,9 +21,11 @@ API backend ASP.NET Core của JobPortal, sử dụng SQL Server và Entity Fram
 - Quản lý tin tuyển dụng, đơn ứng tuyển và trạng thái ứng tuyển.
 - Quản lý công ty, danh mục nghề nghiệp, hồ sơ ứng viên và CV.
 - Dashboard cho quản trị viên và nhà tuyển dụng.
-- Tìm kiếm ứng viên và matching việc làm - ứng viên.
+- Tìm kiếm ứng viên và matching việc làm - ứng viên theo luật, có breakdown và reason giải thích được.
 - Blog, đánh giá công ty, thông báo và việc làm đã lưu.
 - Gói dịch vụ, credit và tích hợp VNPay sandbox.
+- Credit ledger append-only với grant/debit/refund và idempotency key; entitlement thanh toán được snapshot tại thời điểm tạo đơn.
+- Danh sách công ty và báo cáo hỗ trợ phân trang, lọc và envelope thống nhất ở API.
 - Health check, readiness check, rate limit, logging và correlation ID.
 
 ## Kiến trúc thư mục
@@ -121,13 +123,25 @@ dotnet run --project JobPortalApi/JobPortalApi.csproj --launch-profile https
 
 ## Chạy bằng Docker Compose
 
-Tạo `.env` từ `.env.example`, sau đó điền các biến bắt buộc:
+Compose canonical chạy từ thư mục backend và khởi động đủ ba thành phần:
 
 ```bash
+cp .env.example .env
+# điền các biến bắt buộc trong .env
 docker compose up --build
 ```
 
-Compose khởi động SQL Server ở cổng `1433` và API ở cổng `8080`. Chuỗi kết nối nội bộ dùng service name `sqlserver`, không dùng `localhost`.
+| Service | Vai trò | Cổng host |
+| --- | --- | --- |
+| `sqlserver` | SQL Server 2022 | `1433` |
+| `aspnet-api` | ASP.NET Core 8 API | `8080` |
+| `frontend` | Next.js BFF/UI, build từ `../jobportal-fe` | `3000` |
+
+Trong network Compose, frontend gọi backend qua `http://aspnet-api:8080/api`; API gọi SQL Server qua `Server=sqlserver,1433`. Hai named volume là `sqlserver-data` và `cv-data`, trong đó CV được mount tại `/app/private-data/cv`.
+
+File `jobportal-fe/docker-compose.yml` chỉ là compose thành phần frontend; khi chạy riêng phải cung cấp `BACKEND_API_URL` trỏ tới một backend có thể truy cập được. Không dùng `localhost` cho kết nối giữa các container.
+
+Trong lần kiểm tra local gần nhất, `docker compose config` đã hợp lệ. Build image, healthcheck, startup migration và kiểm tra persistence cần Docker Desktop daemon đang chạy; chưa được xác nhận trong môi trường không có daemon.
 
 Các biến Compose quan trọng:
 
@@ -140,6 +154,9 @@ Các biến Compose quan trọng:
 | `VNPAY_TMN_CODE` | Mã merchant VNPay sandbox |
 | `VNPAY_HASH_SECRET` | Khóa ký VNPay sandbox |
 | `VNPAY_RETURN_URL` | URL frontend nhận kết quả thanh toán |
+| `NEXTAUTH_URL` | URL frontend dùng cho NextAuth |
+| `NEXTAUTH_SECRET` | Secret session của NextAuth |
+| `OAUTH_EXCHANGE_SECRET` | Secret trao đổi OAuth giữa BFF và API |
 
 ## Nhóm API chính
 
@@ -179,7 +196,7 @@ dotnet build JobPortalApi.sln
 dotnet test JobPortalApi.sln
 ```
 
-Các test hiện có tập trung vào matching engine, chữ ký VNPay và private CV storage. Khi sửa service hoặc controller, bổ sung test tương ứng trong `JobPortalApi.Tests`.
+Các test hiện có bao phủ auth integration qua `WebApplicationFactory`, matching engine, chữ ký VNPay và private CV storage. Runtime verification local đã kiểm tra thêm workflow payment/credit, paging, ETag, reset password, interview, CV boundary và background jobs. Khi sửa service hoặc controller, bổ sung test tương ứng trong `JobPortalApi.Tests`.
 
 ## Bảo mật và vận hành
 
@@ -190,6 +207,7 @@ Các test hiện có tập trung vào matching engine, chữ ký VNPay và priva
 - JWT kiểm tra issuer, thời hạn, chữ ký và phiên bản mật khẩu.
 - Rate limit riêng cho nhóm xác thực và thanh toán.
 - Bật HTTPS ở môi trường production và sử dụng connection string có thông tin xác thực an toàn.
+- Không gọi hệ thống là production-ready khi chưa hoàn tất xác minh Docker runtime, secret/credential production, OAuth provider và cleanup lịch sử Git trên remote.
 
 ## Liên kết các thành phần
 
