@@ -5,5 +5,8 @@ obj/
 *.suo
 *.log
 private-data/
-JobPortalApi/wwwroot/uploads/cv/
+uploads/
+wwwroot/uploads/
+**/uploads/cv/
+data/cv/
 backups/
