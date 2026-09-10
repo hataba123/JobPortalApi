@@ -270,6 +270,71 @@ namespace JobPortalApi.Services.Infrastructure
                 false,
                 "/uploads/images/blog-tech-workspace.jpg",
                 new DateTime(2026, 8, 5, 8, 0, 0, DateTimeKind.Utc));
+            await UpsertBlogAsync(
+                context,
+                blogAuthor.Id,
+                "lo-trinh-hoc-lap-trinh-vien-moi-bat-dau",
+                "Lộ trình học dành cho lập trình viên mới bắt đầu",
+                "Một lộ trình thực tế giúp bạn đi từ nền tảng lập trình đến dự án đầu tiên và hồ sơ ứng tuyển.",
+                "Hãy chọn một ngôn ngữ chính, nắm chắc cấu trúc dữ liệu cơ bản rồi xây dựng các dự án nhỏ có thể trình bày. Sau mỗi dự án, ghi lại bài học, cải thiện mã nguồn và cập nhật hồ sơ để tiến bộ đều đặn.",
+                "Học tập",
+                new[] { "Learning", "Programming", "Roadmap" },
+                "8 phút",
+                false,
+                "/uploads/images/blog-tech-workspace.jpg",
+                new DateTime(2026, 7, 28, 8, 0, 0, DateTimeKind.Utc));
+            await UpsertBlogAsync(
+                context,
+                blogAuthor.Id,
+                "lam-viec-remote-an-toan-va-hieu-qua",
+                "Làm việc remote an toàn và hiệu quả",
+                "Các thói quen bảo mật và quản lý thời gian cần thiết khi làm việc từ xa trong đội ngũ công nghệ.",
+                "Sử dụng trình quản lý mật khẩu, bật xác thực đa yếu tố và chỉ truy cập tài nguyên công ty qua thiết bị được bảo vệ. Bên cạnh đó, hãy chia nhỏ mục tiêu trong ngày và thống nhất giờ cộng tác với đồng đội.",
+                "Làm việc",
+                new[] { "Remote", "Security", "Productivity" },
+                "6 phút",
+                false,
+                "/uploads/images/blog-team-collaboration.jpg",
+                new DateTime(2026, 7, 21, 8, 0, 0, DateTimeKind.Utc));
+            await UpsertBlogAsync(
+                context,
+                blogAuthor.Id,
+                "ky-nang-phong-van-system-design",
+                "Chuẩn bị phỏng vấn System Design như thế nào?",
+                "Khung tư duy đơn giản để phân tích yêu cầu và trình bày thiết kế hệ thống rõ ràng trong buổi phỏng vấn.",
+                "Bắt đầu bằng việc làm rõ lưu lượng, dữ liệu và yêu cầu phi chức năng. Sau đó trình bày kiến trúc tổng quan, các điểm nghẽn có thể xảy ra và cách mở rộng theo từng giai đoạn.",
+                "Phỏng vấn",
+                new[] { "Interview", "Architecture", "System Design" },
+                "9 phút",
+                true,
+                "/uploads/images/blog-career-profile.jpg",
+                new DateTime(2026, 7, 14, 8, 0, 0, DateTimeKind.Utc));
+            await UpsertBlogAsync(
+                context,
+                blogAuthor.Id,
+                "xay-dung-thuong-hieu-ca-nhan-tren-github",
+                "Xây dựng thương hiệu cá nhân trên GitHub",
+                "Biến GitHub thành hồ sơ năng lực giúp nhà tuyển dụng hiểu rõ hơn về cách bạn xây dựng sản phẩm.",
+                "Chọn một vài dự án tiêu biểu, viết README dễ đọc và duy trì lịch sử commit rõ ràng. Những issue, pull request và tài liệu kỹ thuật chất lượng cũng thể hiện khả năng làm việc nhóm của bạn.",
+                "Nghề nghiệp",
+                new[] { "GitHub", "Portfolio", "Career" },
+                "7 phút",
+                false,
+                "/uploads/images/blog-tech-workspace.jpg",
+                new DateTime(2026, 7, 7, 8, 0, 0, DateTimeKind.Utc));
+            await UpsertBlogAsync(
+                context,
+                blogAuthor.Id,
+                "xu-huong-cong-nghe-cho-su-nghiep-it",
+                "Xu hướng công nghệ đáng chú ý cho sự nghiệp IT",
+                "Những nhóm công nghệ đang tạo ra nhiều cơ hội việc làm và cách chọn hướng phát triển phù hợp.",
+                "Cloud, dữ liệu, an toàn thông tin và tự động hóa tiếp tục mở rộng ở nhiều ngành. Thay vì chạy theo mọi xu hướng, hãy chọn một hướng phù hợp với nền tảng hiện tại và đầu tư đủ sâu qua dự án thực tế.",
+                "Công nghệ",
+                new[] { "Technology", "Cloud", "Data" },
+                "6 phút",
+                false,
+                "/uploads/images/blog-team-collaboration.jpg",
+                new DateTime(2026, 6, 30, 8, 0, 0, DateTimeKind.Utc));
 
             await context.SaveChangesAsync();
         }
