@@ -3,6 +3,8 @@ using JobPortalApi.Services.Interface.User;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Authorization;
 
+using JobPortalApi.DTOs.Shared;
+
 namespace JobPortalApi.Controllers.User
 {
     [Route("api/companies")]
@@ -18,9 +20,13 @@ namespace JobPortalApi.Controllers.User
 
         [HttpGet]
         [AllowAnonymous]
-        public async Task<IActionResult> GetAll()
+        public async Task<IActionResult> GetAll(
+            [FromQuery] PagedQuery query,
+            [FromQuery] string? industry,
+            [FromQuery] string? location,
+            [FromQuery] string? employees)
         {
-            var companies = await _companyService.GetAllAsync();
+            var companies = await _companyService.GetAllPagedAsync(query, industry, location, employees);
             return Ok(companies);
         }
 

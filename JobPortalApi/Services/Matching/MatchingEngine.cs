@@ -114,9 +114,9 @@ namespace JobPortalApi.Services.Matching
 
         public static CalculatedMatch Calculate(CandidateMatchInput candidate, JobMatchInput job)
         {
-            var requiredSkills = SplitSkills(job.SkillsRequired).Count > 0
-                ? SplitSkills(job.SkillsRequired)
-                : SplitSkills(job.Tags);
+            var requiredSkills = SplitSkills(job.SkillsRequired);
+            if (requiredSkills.Count == 0)
+                requiredSkills = SplitSkills(job.Tags);
             var candidateSkills = SplitSkills(candidate.Skills)
                 .Concat(SplitSkills(candidate.Certificates))
                 .ToHashSet(StringComparer.Ordinal);

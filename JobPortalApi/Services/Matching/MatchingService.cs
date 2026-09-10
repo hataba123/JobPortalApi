@@ -17,15 +17,21 @@ namespace JobPortalApi.Services.Matching
 
         public async Task<PagedMatchesDto> GetRecommendedJobsAsync(Guid candidateId, MatchQueryDto query)
         {
-            var profile = await _context.candidateProfiles.FirstOrDefaultAsync(p => p.UserId == candidateId);
+            var profile = await _context.candidateProfiles
+                .AsNoTracking()
+                .FirstOrDefaultAsync(p => p.UserId == candidateId);
             if (profile == null) throw new KeyNotFoundException("Hồ sơ ứng viên chưa tồn tại.");
 
-            var jobs = await ActiveJobs().ToListAsync();
+            var jobs = await ActiveJobs().AsNoTracking().ToListAsync();
+            var existingResults = await _context.MatchResults
+                .Where(item => item.CandidateId == candidateId && jobs.Select(job => job.Id).Contains(item.JobPostId))
+                .ToDictionaryAsync(item => item.JobPostId);
+            var candidateInput = ToCandidateInput(profile);
             var matches = new List<MatchResultDto>();
             foreach (var job in jobs)
             {
-                var result = MatchingEngine.Calculate(ToCandidateInput(profile), ToJobInput(job));
-                await UpsertResultAsync(result);
+                var result = MatchingEngine.Calculate(candidateInput, ToJobInput(job));
+                UpsertResult(existingResults, result);
                 matches.Add(WithJob(result, job));
             }
             await _context.SaveChangesAsync();
@@ -39,7 +45,9 @@ namespace JobPortalApi.Services.Matching
 
         public async Task<PagedMatchesDto> RankCandidatesAsync(Guid actorId, Guid jobPostId, bool isAdmin, MatchQueryDto query)
         {
-            var job = await _context.JobPosts.FirstOrDefaultAsync(j => j.Id == jobPostId);
+            var job = await _context.JobPosts
+                .AsNoTracking()
+                .FirstOrDefaultAsync(j => j.Id == jobPostId);
             if (job == null) throw new KeyNotFoundException("Không tìm thấy tin tuyển dụng.");
             if (!isAdmin && job.EmployerId != actorId)
                 throw new UnauthorizedAccessException("Bạn không có quyền xem xếp hạng tin này.");
@@ -47,18 +55,23 @@ namespace JobPortalApi.Services.Matching
             var applications = await _context.Jobs
                 .Where(a => a.JobPostId == jobPostId)
                 .Include(a => a.Candidate)
+                .AsNoTracking()
                 .ToListAsync();
             var candidateIds = applications.Select(a => a.CandidateId).ToArray();
             var profiles = await _context.candidateProfiles
                 .Where(p => candidateIds.Contains(p.UserId))
+                .AsNoTracking()
                 .ToDictionaryAsync(p => p.UserId);
+            var existingResults = await _context.MatchResults
+                .Where(item => item.JobPostId == jobPostId && candidateIds.Contains(item.CandidateId))
+                .ToDictionaryAsync(item => item.CandidateId);
 
             var matches = new List<MatchResultDto>();
             foreach (var application in applications)
             {
                 if (!profiles.TryGetValue(application.CandidateId, out var profile)) continue;
                 var result = MatchingEngine.Calculate(ToCandidateInput(profile), ToJobInput(job));
-                await UpsertResultAsync(result);
+                UpsertResult(existingResults, result, result.CandidateId);
                 matches.Add(new MatchResultDto
                 {
                     JobPostId = result.JobPostId,
@@ -89,7 +102,9 @@ namespace JobPortalApi.Services.Matching
 
         public async Task<MatchResultDto> GetCandidateMatchAsync(Guid actorId, Guid jobPostId, Guid candidateId, bool isAdmin)
         {
-            var job = await _context.JobPosts.FirstOrDefaultAsync(j => j.Id == jobPostId);
+            var job = await _context.JobPosts
+                .AsNoTracking()
+                .FirstOrDefaultAsync(j => j.Id == jobPostId);
             if (job == null) throw new KeyNotFoundException("Không tìm thấy tin tuyển dụng.");
             if (!isAdmin && job.EmployerId != actorId)
                 throw new UnauthorizedAccessException("Bạn không có quyền xem xếp hạng tin này.");
@@ -97,10 +112,12 @@ namespace JobPortalApi.Services.Matching
             var item = await _context.Jobs
                 .Where(a => a.JobPostId == jobPostId && a.CandidateId == candidateId)
                 .Include(a => a.Candidate)
+                .AsNoTracking()
                 .FirstOrDefaultAsync();
             if (item == null) throw new KeyNotFoundException("Ứng viên chưa ứng tuyển hoặc chưa có hồ sơ.");
 
             var profile = await _context.candidateProfiles
+                .AsNoTracking()
                 .FirstOrDefaultAsync(p => p.UserId == candidateId);
             if (profile == null) throw new KeyNotFoundException("Ứng viên chưa ứng tuyển hoặc chưa có hồ sơ.");
 
@@ -138,13 +155,30 @@ namespace JobPortalApi.Services.Matching
         {
             var entity = await _context.MatchResults
                 .FirstOrDefaultAsync(m => m.CandidateId == result.CandidateId && m.JobPostId == result.JobPostId);
-            if (entity == null)
+            var existing = entity == null
+                ? new Dictionary<Guid, MatchResult>()
+                : new Dictionary<Guid, MatchResult> { [result.JobPostId] = entity };
+            UpsertResult(existing, result);
+        }
+
+        private void UpsertResult(IReadOnlyDictionary<Guid, MatchResult> existingResults, CalculatedMatch result)
+            => UpsertResult(existingResults, result, result.JobPostId);
+
+        private void UpsertResult(
+            IReadOnlyDictionary<Guid, MatchResult> existingResults,
+            CalculatedMatch result,
+            Guid lookupKey)
+        {
+            MatchResult entity;
+            if (!existingResults.TryGetValue(lookupKey, out entity!))
             {
                 entity = new MatchResult
                 {
                     CandidateId = result.CandidateId,
                     JobPostId = result.JobPostId,
                 };
+                if (existingResults is IDictionary<Guid, MatchResult> mutableResults)
+                    mutableResults[lookupKey] = entity;
                 _context.MatchResults.Add(entity);
             }
             entity.TotalScore = result.TotalScore;
