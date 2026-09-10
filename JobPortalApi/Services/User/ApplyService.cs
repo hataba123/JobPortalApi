@@ -375,7 +375,17 @@ public sealed class ApplyService : IApplyService
 
         var oldStatus = application.Status;
         if (oldStatus == nextStatus)
+        {
+            if (expectedVersion is { Length: > 0 } &&
+                !application.RowVersion.SequenceEqual(expectedVersion))
+            {
+                throw new ApiConflictException(
+                    "Hồ sơ đã được người khác cập nhật. Vui lòng tải lại dữ liệu.",
+                    "CONCURRENCY_CONFLICT",
+                    new { version = ConcurrencyToken.Encode(application.RowVersion) });
+            }
             return ToTransition(application);
+        }
 
         application.Status = nextStatus;
         AddHistory(application, oldStatus, nextStatus, actorId, reason);

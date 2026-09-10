@@ -139,8 +139,9 @@ public sealed class BackgroundProcessingService : BackgroundService
                 await email.SendApplicationConfirmationAsync(root.GetProperty("CandidateEmail").GetString() ?? string.Empty, root.GetProperty("JobTitle").GetString() ?? string.Empty, true);
                 break;
             case "application.status.changed":
-                await AddNotificationAsync(db, root.GetProperty("CandidateId").GetGuid(), $"Trạng thái hồ sơ cho tin \"{root.GetProperty("JobTitle").GetString()}\" đã chuyển thành {root.GetProperty("ToStatus").GetString()}.", "application_status_changed", sourceId, cancellationToken);
-                await email.SendApplicationStatusChangedAsync(root.GetProperty("CandidateEmail").GetString() ?? string.Empty, root.GetProperty("JobTitle").GetString() ?? string.Empty, root.GetProperty("ToStatus").GetString() ?? string.Empty, true);
+                var status = ReadStatus(root.GetProperty("ToStatus"));
+                await AddNotificationAsync(db, root.GetProperty("CandidateId").GetGuid(), $"Trạng thái hồ sơ cho tin \"{root.GetProperty("JobTitle").GetString()}\" đã chuyển thành {status}.", "application_status_changed", sourceId, cancellationToken);
+                await email.SendApplicationStatusChangedAsync(root.GetProperty("CandidateEmail").GetString() ?? string.Empty, root.GetProperty("JobTitle").GetString() ?? string.Empty, status, true);
                 break;
             case "interview.scheduled":
                 await AddNotificationAsync(db, root.GetProperty("CandidateId").GetGuid(), $"Bạn có lịch phỏng vấn cho tin \"{root.GetProperty("JobTitle").GetString()}\".", "interview_scheduled", sourceId, cancellationToken);
@@ -261,5 +262,19 @@ public sealed class BackgroundProcessingService : BackgroundService
                 Id = Guid.NewGuid(), UserId = userId, Message = message, Type = type,
                 SourceMessageId = sourceId, Read = false, CreatedAt = DateTime.UtcNow
             });
+    }
+
+    private static string ReadStatus(JsonElement value)
+    {
+        if (value.ValueKind == JsonValueKind.String)
+            return value.GetString() ?? string.Empty;
+
+        // Read legacy numeric payloads as well, so messages written before
+        // the enum serialization fix can still be retried successfully.
+        if (value.ValueKind == JsonValueKind.Number && value.TryGetInt32(out var numeric) &&
+            Enum.IsDefined(typeof(ApplyStatus), numeric))
+            return ((ApplyStatus)numeric).ToString();
+
+        return value.ToString();
     }
 }
