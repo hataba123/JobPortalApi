@@ -85,6 +85,24 @@ public class PaymentOrderDto
     public string? PaymentUrl { get; set; }
 }
 
+public class PaymentOrderListItemDto
+{
+    public Guid Id { get; set; }
+    public Guid UserId { get; set; }
+    public string UserFullName { get; set; } = string.Empty;
+    public string UserEmail { get; set; } = string.Empty;
+    public Guid PlanId { get; set; }
+    public string PlanName { get; set; } = string.Empty;
+    public string VnpTxnRef { get; set; } = string.Empty;
+    public decimal Amount { get; set; }
+    public string Currency { get; set; } = "VND";
+    public PaymentOrderStatus Status { get; set; }
+    public string? ProviderResponseCode { get; set; }
+    public DateTime CreatedAt { get; set; }
+    public DateTime? PaidAt { get; set; }
+    public DateTime ExpiresAt { get; set; }
+}
+
 public class CreditLedgerDto
 {
     public Guid Id { get; set; }

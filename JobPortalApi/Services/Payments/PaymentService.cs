@@ -123,6 +123,41 @@ public class PaymentService
         return ToPaymentOrderDto(order);
     }
 
+    public async Task<List<PaymentOrderListItemDto>> ListPaymentOrdersAsync(Guid? userId = null)
+    {
+        var query = _context.PaymentOrders
+            .AsNoTracking()
+            .Include(o => o.User)
+            .Include(o => o.Plan)
+            .AsQueryable();
+
+        if (userId.HasValue)
+        {
+            query = query.Where(o => o.UserId == userId.Value);
+        }
+
+        return await query
+            .OrderByDescending(o => o.CreatedAt)
+            .Select(o => new PaymentOrderListItemDto
+            {
+                Id = o.Id,
+                UserId = o.UserId,
+                UserFullName = o.User != null ? (o.User.FullName ?? string.Empty) : string.Empty,
+                UserEmail = o.User != null ? (o.User.Email ?? string.Empty) : string.Empty,
+                PlanId = o.PlanId,
+                PlanName = o.Plan != null ? o.Plan.Name : string.Empty,
+                VnpTxnRef = o.VnpTxnRef,
+                Amount = o.Amount,
+                Currency = o.Currency,
+                Status = o.Status,
+                ProviderResponseCode = o.ProviderResponseCode,
+                CreatedAt = o.CreatedAt,
+                PaidAt = o.PaidAt,
+                ExpiresAt = o.ExpiresAt,
+            })
+            .ToListAsync();
+    }
+
     public async Task<(string RspCode, string Message)> ProcessVnpayIpnAsync(
         IReadOnlyDictionary<string, string> query)
     {

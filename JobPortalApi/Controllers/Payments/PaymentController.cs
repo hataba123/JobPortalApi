@@ -90,6 +90,20 @@ public class PaymentController : ControllerBase
         return result == null ? NotFound() : Ok(result);
     }
 
+    [HttpGet("admin/payment-orders")]
+    [Authorize(Roles = "Admin")]
+    public async Task<IActionResult> GetAllPaymentOrders()
+    {
+        return Ok(await _paymentService.ListPaymentOrdersAsync());
+    }
+
+    [HttpGet("recruiter/payment-orders")]
+    [Authorize(Roles = "Admin,Recruiter")]
+    public async Task<IActionResult> GetMyPaymentOrders()
+    {
+        return Ok(await _paymentService.ListPaymentOrdersAsync(GetUserId()));
+    }
+
     [HttpGet("payments/vnpay/return")]
     [AllowAnonymous]
     public IActionResult VnpayReturn([FromQuery] string? vnp_ResponseCode, [FromQuery] string? vnp_TxnRef)
