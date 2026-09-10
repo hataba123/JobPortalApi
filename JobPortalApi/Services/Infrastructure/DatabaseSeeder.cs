@@ -9,7 +9,15 @@ namespace JobPortalApi.Services.Infrastructure
         private static readonly Guid AdminId = Guid.Parse("00000000-0000-0000-0000-000000000001");
         private static readonly Guid RecruiterId = Guid.Parse("00000000-0000-0000-0000-000000000002");
         private static readonly Guid CandidateId = Guid.Parse("00000000-0000-0000-0000-000000000003");
+        private static readonly Guid RecruiterSecondId = Guid.Parse("00000000-0000-0000-0000-000000000004");
+        private static readonly Guid CandidateSecondId = Guid.Parse("00000000-0000-0000-0000-000000000005");
+        private static readonly Guid CandidateThirdId = Guid.Parse("00000000-0000-0000-0000-000000000006");
+        private static readonly Guid CandidateFourthId = Guid.Parse("00000000-0000-0000-0000-000000000007");
         private static readonly Guid CategoryId = Guid.Parse("10000000-0000-0000-0000-000000000001");
+        private static readonly Guid FrontendCategoryId = Guid.Parse("10000000-0000-0000-0000-000000000002");
+        private static readonly Guid DataCategoryId = Guid.Parse("10000000-0000-0000-0000-000000000003");
+        private static readonly Guid DevopsCategoryId = Guid.Parse("10000000-0000-0000-0000-000000000004");
+        private static readonly Guid MobileCategoryId = Guid.Parse("10000000-0000-0000-0000-000000000005");
         private static readonly Guid CompanyId = Guid.Parse("20000000-0000-0000-0000-000000000001");
         private static readonly Guid MicrosoftCompanyId = Guid.Parse("20000000-0000-0000-0000-000000000002");
         private static readonly Guid GoogleCompanyId = Guid.Parse("20000000-0000-0000-0000-000000000003");
@@ -17,6 +25,11 @@ namespace JobPortalApi.Services.Infrastructure
         private static readonly Guid GithubCompanyId = Guid.Parse("20000000-0000-0000-0000-000000000005");
         private static readonly Guid AppleCompanyId = Guid.Parse("20000000-0000-0000-0000-000000000006");
         private static readonly Guid JobPostId = Guid.Parse("30000000-0000-0000-0000-000000000001");
+        private static readonly Guid FrontendJobPostId = Guid.Parse("30000000-0000-0000-0000-000000000002");
+        private static readonly Guid DataJobPostId = Guid.Parse("30000000-0000-0000-0000-000000000003");
+        private static readonly Guid DevopsJobPostId = Guid.Parse("30000000-0000-0000-0000-000000000004");
+        private static readonly Guid MobileJobPostId = Guid.Parse("30000000-0000-0000-0000-000000000005");
+        private static readonly Guid ProductJobPostId = Guid.Parse("30000000-0000-0000-0000-000000000006");
         private static readonly Guid PlanId = Guid.Parse("40000000-0000-0000-0000-000000000001");
 
         public static async Task SeedAsync(IServiceProvider services, IConfiguration configuration)
@@ -37,9 +50,19 @@ namespace JobPortalApi.Services.Infrastructure
                 context.Categories.Add(category);
             }
 
+            await UpsertCategoryAsync(context, FrontendCategoryId, "Frontend & UI", "layout", "#7c3aed");
+            await UpsertCategoryAsync(context, DataCategoryId, "Dữ liệu & AI", "database", "#0891b2");
+            await UpsertCategoryAsync(context, DevopsCategoryId, "DevOps & Cloud", "cloud", "#ea580c");
+            await UpsertCategoryAsync(context, MobileCategoryId, "Mobile", "smartphone", "#16a34a");
+
             await UpsertUserAsync(context, AdminId, "seed-admin@example.test", "Seed Admin", UserRole.Admin, passwordHash);
             await UpsertUserAsync(context, RecruiterId, "seed-recruiter@example.test", "Seed Recruiter", UserRole.Recruiter, passwordHash);
             await UpsertUserAsync(context, CandidateId, "seed-candidate@example.test", "Seed Candidate", UserRole.Candidate, passwordHash);
+            await UpsertUserAsync(context, RecruiterSecondId, "seed-recruiter-2@example.test", "Seed Recruiter 2", UserRole.Recruiter, passwordHash);
+            await UpsertCandidateProfileAsync(context, CandidateId, "seed-candidate@example.test", "Seed Candidate", "TypeScript, NestJS, PostgreSQL", 3, "Đại học Công nghệ", "Hà Nội", "Full-time", passwordHash);
+            await UpsertCandidateProfileAsync(context, CandidateSecondId, "seed-candidate-2@example.test", "Nguyễn Minh Anh", "React, TypeScript, Next.js", 4, "Đại học Bách khoa", "Hồ Chí Minh", "Full-time", passwordHash);
+            await UpsertCandidateProfileAsync(context, CandidateThirdId, "seed-candidate-3@example.test", "Trần Quốc Bảo", "Python, SQL, Machine Learning", 3, "Đại học Công nghệ", "Đà Nẵng", "Full-time", passwordHash);
+            await UpsertCandidateProfileAsync(context, CandidateFourthId, "seed-candidate-4@example.test", "Lê Hoàng Nam", "AWS, Docker, Kubernetes", 5, "Đại học FPT", "Hà Nội", "Remote", passwordHash);
 
             var company = await context.Companies.IgnoreQueryFilters().FirstOrDefaultAsync(c => c.Id == CompanyId);
             if (company == null)
@@ -149,6 +172,30 @@ namespace JobPortalApi.Services.Infrastructure
             jobPost.CategoryId = CategoryId;
             jobPost.Logo = "/uploads/logo/jobportal-demo.svg";
 
+            await UpsertJobPostAsync(context, FrontendJobPostId, "Frontend Developer (Demo)", "Xây dựng giao diện tuyển dụng tốc độ cao và thân thiện trên nhiều thiết bị.", "React, TypeScript, Next.js", "Hồ Chí Minh", 28000000, RecruiterId, GoogleCompanyId, "Full-time", new List<string> { "React", "Next.js", "TypeScript" }, FrontendCategoryId, 2, "Đại học", "/uploads/logo/company-google.svg");
+            await UpsertJobPostAsync(context, DataJobPostId, "Data Engineer (Demo)", "Thiết kế pipeline dữ liệu và mô hình báo cáo cho sản phẩm công nghệ.", "Python, SQL, Airflow", "Đà Nẵng", 32000000, RecruiterId, AmazonCompanyId, "Full-time", new List<string> { "Python", "SQL", "Data" }, DataCategoryId, 3, "Đại học", "/uploads/logo/company-amazon.svg");
+            await UpsertJobPostAsync(context, DevopsJobPostId, "Cloud DevOps Engineer (Demo)", "Vận hành hạ tầng cloud an toàn, tự động hóa triển khai và giám sát hệ thống.", "AWS, Docker, Kubernetes", "Remote", 38000000, RecruiterId, MicrosoftCompanyId, "Remote", new List<string> { "AWS", "Docker", "Kubernetes" }, DevopsCategoryId, 4, "Đại học", "/uploads/logo/company-microsoft.svg");
+            await UpsertJobPostAsync(context, MobileJobPostId, "Mobile Developer (Demo)", "Phát triển trải nghiệm mobile mượt mà cho ứng dụng tìm việc JobPortal.", "Swift, iOS, REST API", "Hồ Chí Minh", 30000000, RecruiterId, AppleCompanyId, "Full-time", new List<string> { "Swift", "iOS", "Mobile" }, MobileCategoryId, 2, "Cao đẳng", "/uploads/logo/company-apple.svg");
+            await UpsertJobPostAsync(context, ProductJobPostId, "Product Designer (Demo)", "Thiết kế trải nghiệm người dùng và hệ thống giao diện cho nền tảng tuyển dụng.", "Figma, UX Research, Design System", "Hà Nội", 26000000, RecruiterId, GithubCompanyId, "Hybrid", new List<string> { "Figma", "UX", "Product" }, FrontendCategoryId, 2, "Không bắt buộc", "/uploads/logo/company-github.svg");
+
+            await UpsertJobAsync(context, Guid.Parse("50000000-0000-0000-0000-000000000001"), JobPostId, CandidateId, ApplyStatus.Reviewed);
+            await UpsertJobAsync(context, Guid.Parse("50000000-0000-0000-0000-000000000002"), FrontendJobPostId, CandidateSecondId, ApplyStatus.Accepted);
+            await UpsertJobAsync(context, Guid.Parse("50000000-0000-0000-0000-000000000003"), DataJobPostId, CandidateThirdId, ApplyStatus.Pending);
+            await UpsertJobAsync(context, Guid.Parse("50000000-0000-0000-0000-000000000004"), DevopsJobPostId, CandidateFourthId, ApplyStatus.Reviewed);
+            await UpsertSavedJobAsync(context, Guid.Parse("60000000-0000-0000-0000-000000000001"), CandidateId, DevopsJobPostId);
+            await UpsertSavedJobAsync(context, Guid.Parse("60000000-0000-0000-0000-000000000002"), CandidateSecondId, MobileJobPostId);
+
+            jobPost.Applicants = 1;
+            await SetJobApplicantsAsync(context, FrontendJobPostId, 1);
+            await SetJobApplicantsAsync(context, DataJobPostId, 1);
+            await SetJobApplicantsAsync(context, DevopsJobPostId, 1);
+            await SetCompanyOpenJobsAsync(context, CompanyId, 1);
+            await SetCompanyOpenJobsAsync(context, GoogleCompanyId, 1);
+            await SetCompanyOpenJobsAsync(context, AmazonCompanyId, 1);
+            await SetCompanyOpenJobsAsync(context, MicrosoftCompanyId, 1);
+            await SetCompanyOpenJobsAsync(context, AppleCompanyId, 1);
+            await SetCompanyOpenJobsAsync(context, GithubCompanyId, 1);
+
             var plan = await context.ServicePlans.FirstOrDefaultAsync(p => p.Id == PlanId);
             if (plan == null)
             {
@@ -225,6 +272,134 @@ namespace JobPortalApi.Services.Infrastructure
                 new DateTime(2026, 8, 5, 8, 0, 0, DateTimeKind.Utc));
 
             await context.SaveChangesAsync();
+        }
+
+        private static async Task UpsertCategoryAsync(ApplicationDbContext context, Guid id, string name, string icon, string color)
+        {
+            var category = await context.Categories.IgnoreQueryFilters().FirstOrDefaultAsync(item => item.Id == id);
+            if (category == null)
+            {
+                category = new Category { Id = id };
+                context.Categories.Add(category);
+            }
+
+            category.Name = name;
+            category.Icon = icon;
+            category.Color = color;
+        }
+
+        private static async Task UpsertCandidateProfileAsync(
+            ApplicationDbContext context,
+            Guid userId,
+            string email,
+            string fullName,
+            string skills,
+            int experienceYears,
+            string education,
+            string preferredLocation,
+            string preferredJobType,
+            string passwordHash)
+        {
+            await UpsertUserAsync(context, userId, email, fullName, UserRole.Candidate, passwordHash);
+            var profile = await context.candidateProfiles.IgnoreQueryFilters().FirstOrDefaultAsync(item => item.UserId == userId);
+            if (profile == null)
+            {
+                profile = new CandidateProfile { Id = Guid.NewGuid(), UserId = userId };
+                context.candidateProfiles.Add(profile);
+            }
+
+            profile.Skills = skills;
+            profile.ExperienceYears = experienceYears;
+            profile.Education = education;
+            profile.PreferredLocation = preferredLocation;
+            profile.PreferredJobType = preferredJobType;
+        }
+
+        private static async Task UpsertJobPostAsync(
+            ApplicationDbContext context,
+            Guid id,
+            string title,
+            string description,
+            string skillsRequired,
+            string location,
+            decimal salary,
+            Guid employerId,
+            Guid companyId,
+            string type,
+            List<string> tags,
+            Guid categoryId,
+            int minExperienceYears,
+            string educationRequirement,
+            string logo)
+        {
+            var jobPost = await context.JobPosts.IgnoreQueryFilters().FirstOrDefaultAsync(item => item.Id == id);
+            if (jobPost == null)
+            {
+                jobPost = new JobPost { Id = id };
+                context.JobPosts.Add(jobPost);
+            }
+
+            jobPost.Title = title;
+            jobPost.Description = description;
+            jobPost.SkillsRequired = skillsRequired;
+            jobPost.Location = location;
+            jobPost.Salary = salary;
+            jobPost.EmployerId = employerId;
+            jobPost.CompanyId = companyId;
+            jobPost.Type = type;
+            jobPost.Tags = tags;
+            jobPost.Applicants = 0;
+            jobPost.CreatedAt = jobPost.CreatedAt == default ? DateTime.UtcNow : jobPost.CreatedAt;
+            jobPost.DeletedAt = null;
+            jobPost.ExpiresAt = DateTime.UtcNow.AddDays(30);
+            jobPost.Status = JobPostStatus.Active;
+            jobPost.MinExperienceYears = minExperienceYears;
+            jobPost.EducationRequirement = educationRequirement;
+            jobPost.CategoryId = categoryId;
+            jobPost.Logo = logo;
+        }
+
+        private static async Task UpsertJobAsync(ApplicationDbContext context, Guid id, Guid jobPostId, Guid candidateId, ApplyStatus status)
+        {
+            var job = await context.Jobs.FirstOrDefaultAsync(item => item.Id == id);
+            if (job == null)
+            {
+                job = new Job { Id = id };
+                context.Jobs.Add(job);
+            }
+
+            job.JobPostId = jobPostId;
+            job.CandidateId = candidateId;
+            job.AppliedAt = new DateTime(2026, 9, 1, 8, 0, 0, DateTimeKind.Utc);
+            job.CVUrl = "/uploads/cv/demo-cv.pdf";
+            job.Status = status;
+        }
+
+        private static async Task UpsertSavedJobAsync(ApplicationDbContext context, Guid id, Guid userId, Guid jobPostId)
+        {
+            var savedJob = await context.SavedJobs.FirstOrDefaultAsync(item => item.UserId == userId && item.JobPostId == jobPostId);
+            if (savedJob == null)
+            {
+                context.SavedJobs.Add(new SavedJob
+                {
+                    Id = id,
+                    UserId = userId,
+                    JobPostId = jobPostId,
+                    SavedAt = new DateTime(2026, 9, 1, 8, 0, 0, DateTimeKind.Utc)
+                });
+            }
+        }
+
+        private static async Task SetJobApplicantsAsync(ApplicationDbContext context, Guid jobPostId, int applicants)
+        {
+            var jobPost = await context.JobPosts.IgnoreQueryFilters().FirstOrDefaultAsync(item => item.Id == jobPostId);
+            if (jobPost != null) jobPost.Applicants = applicants;
+        }
+
+        private static async Task SetCompanyOpenJobsAsync(ApplicationDbContext context, Guid companyId, int openJobs)
+        {
+            var company = await context.Companies.IgnoreQueryFilters().FirstOrDefaultAsync(item => item.Id == companyId);
+            if (company != null) company.OpenJobs = openJobs;
         }
 
         private static async Task UpsertCompanyAsync(
