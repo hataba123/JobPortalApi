@@ -1,4 +1,4 @@
-﻿using JobPortalApi.DTOs.Category;
+using JobPortalApi.DTOs.Category;
 
 namespace JobPortalApi.Services.Interface.User
 {
@@ -6,5 +6,8 @@ namespace JobPortalApi.Services.Interface.User
     {
         Task<IEnumerable<CategoryDto>> GetAllAsync();
         Task<CategoryDto?> GetByIdAsync(Guid id);
+        Task<CategoryDto> CreateAsync(CreateCategoryDto dto);
+        Task<CategoryDto?> UpdateAsync(Guid id, UpdateCategoryDto dto);
+        Task<bool> DeleteAsync(Guid id);
     }
 }
