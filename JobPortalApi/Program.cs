@@ -20,6 +20,7 @@ using JobPortalApi.Services.Payments;
 using JobPortalApi.Services.Notifications;
 using JobPortalApi.Services.Infrastructure;
 using JobPortalApi.Middleware;
+using JobPortalApi.Services.Media;
 
 var builder = WebApplication.CreateBuilder(args);
 var jwtKey = builder.Configuration["Jwt:Key"];
@@ -63,6 +64,7 @@ builder.Services.AddScoped<IJobService, JobService>();
 builder.Services.AddScoped<IApplyService, ApplyService>();
 builder.Services.AddScoped<MatchingService>();
 builder.Services.AddScoped<PaymentService>();
+builder.Services.AddScoped<PublicMediaService>();
 // add db context
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection"),
@@ -259,10 +261,12 @@ if (app.Environment.IsDevelopment())
         }
         await next();
     });
+    var webRoot = app.Environment.WebRootPath
+        ?? Path.Combine(app.Environment.ContentRootPath, "wwwroot");
+    Directory.CreateDirectory(webRoot);
     app.UseStaticFiles(new StaticFileOptions
     {
-        FileProvider = new PhysicalFileProvider(
-        Path.Combine(Directory.GetCurrentDirectory(), "wwwroot")),
+        FileProvider = new PhysicalFileProvider(webRoot),
         RequestPath = ""
     });
     app.UseCors("AllowFrontends"); // phải gọi trước UseAuthorization() 
@@ -274,8 +278,9 @@ if (app.Environment.IsDevelopment())
 
     app.MapControllers();
 
+    var environmentName = app.Environment.EnvironmentName;
     app.Run();
-    Console.WriteLine("Environment: " + app.Environment.EnvironmentName);
+    Console.WriteLine("Environment: " + environmentName);
 
     static string GetClientAddress(HttpContext context) =>
         context.Connection.RemoteIpAddress?.ToString() ?? "unknown";

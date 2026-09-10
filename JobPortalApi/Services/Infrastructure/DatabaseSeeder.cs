@@ -53,6 +53,7 @@ namespace JobPortalApi.Services.Infrastructure
             company.DeletedAt = null;
             company.VerificationStatus = CompanyVerificationStatus.Verified;
             company.VerifiedAt = DateTime.UtcNow;
+            company.Logo = "/uploads/logo/jobportal-demo.svg";
 
             var jobPost = await context.JobPosts.IgnoreQueryFilters().FirstOrDefaultAsync(j => j.Id == JobPostId);
             if (jobPost == null)
@@ -77,6 +78,7 @@ namespace JobPortalApi.Services.Infrastructure
             jobPost.MinExperienceYears = 2;
             jobPost.EducationRequirement = "Đại học";
             jobPost.CategoryId = CategoryId;
+            jobPost.Logo = "/uploads/logo/jobportal-demo.svg";
 
             var plan = await context.ServicePlans.FirstOrDefaultAsync(p => p.Id == PlanId);
             if (plan == null)
