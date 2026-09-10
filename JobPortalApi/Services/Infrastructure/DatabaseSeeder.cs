@@ -11,6 +11,11 @@ namespace JobPortalApi.Services.Infrastructure
         private static readonly Guid CandidateId = Guid.Parse("00000000-0000-0000-0000-000000000003");
         private static readonly Guid CategoryId = Guid.Parse("10000000-0000-0000-0000-000000000001");
         private static readonly Guid CompanyId = Guid.Parse("20000000-0000-0000-0000-000000000001");
+        private static readonly Guid MicrosoftCompanyId = Guid.Parse("20000000-0000-0000-0000-000000000002");
+        private static readonly Guid GoogleCompanyId = Guid.Parse("20000000-0000-0000-0000-000000000003");
+        private static readonly Guid AmazonCompanyId = Guid.Parse("20000000-0000-0000-0000-000000000004");
+        private static readonly Guid GithubCompanyId = Guid.Parse("20000000-0000-0000-0000-000000000005");
+        private static readonly Guid AppleCompanyId = Guid.Parse("20000000-0000-0000-0000-000000000006");
         private static readonly Guid JobPostId = Guid.Parse("30000000-0000-0000-0000-000000000001");
         private static readonly Guid PlanId = Guid.Parse("40000000-0000-0000-0000-000000000001");
 
@@ -54,6 +59,67 @@ namespace JobPortalApi.Services.Infrastructure
             company.VerificationStatus = CompanyVerificationStatus.Verified;
             company.VerifiedAt = DateTime.UtcNow;
             company.Logo = "/uploads/logo/jobportal-demo.svg";
+
+            await UpsertCompanyAsync(
+                context,
+                MicrosoftCompanyId,
+                "Microsoft Vietnam (Demo)",
+                "/uploads/logo/company-microsoft.svg",
+                "Hà Nội",
+                "1000+",
+                "Công nghệ thông tin",
+                4.8,
+                "https://www.microsoft.com",
+                "1975",
+                "Cloud,AI,Engineering");
+            await UpsertCompanyAsync(
+                context,
+                GoogleCompanyId,
+                "Google Vietnam (Demo)",
+                "/uploads/logo/company-google.svg",
+                "Hồ Chí Minh",
+                "1000+",
+                "Công nghệ thông tin",
+                4.9,
+                "https://about.google",
+                "1998",
+                "Search,Cloud,AI");
+            await UpsertCompanyAsync(
+                context,
+                AmazonCompanyId,
+                "Amazon Web Services (Demo)",
+                "/uploads/logo/company-amazon.svg",
+                "Đà Nẵng",
+                "501-1000",
+                "Điện toán đám mây",
+                4.7,
+                "https://aws.amazon.com",
+                "2006",
+                "AWS,Cloud,DevOps");
+            await UpsertCompanyAsync(
+                context,
+                GithubCompanyId,
+                "GitHub Vietnam (Demo)",
+                "/uploads/logo/company-github.svg",
+                "Hà Nội",
+                "201-500",
+                "Nền tảng phát triển",
+                4.6,
+                "https://github.com",
+                "2008",
+                "Git,Open source,Developer tools");
+            await UpsertCompanyAsync(
+                context,
+                AppleCompanyId,
+                "Apple Developer (Demo)",
+                "/uploads/logo/company-apple.svg",
+                "Hồ Chí Minh",
+                "1000+",
+                "Sản phẩm công nghệ",
+                4.8,
+                "https://developer.apple.com",
+                "1976",
+                "iOS,Swift,Design");
 
             var jobPost = await context.JobPosts.IgnoreQueryFilters().FirstOrDefaultAsync(j => j.Id == JobPostId);
             if (jobPost == null)
@@ -156,6 +222,43 @@ namespace JobPortalApi.Services.Infrastructure
                 new DateTime(2026, 8, 5, 8, 0, 0, DateTimeKind.Utc));
 
             await context.SaveChangesAsync();
+        }
+
+        private static async Task UpsertCompanyAsync(
+            ApplicationDbContext context,
+            Guid id,
+            string name,
+            string logo,
+            string location,
+            string employees,
+            string industry,
+            double rating,
+            string website,
+            string founded,
+            string tags)
+        {
+            var company = await context.Companies.IgnoreQueryFilters().FirstOrDefaultAsync(item => item.Id == id);
+            if (company == null)
+            {
+                company = new Company { Id = id };
+                context.Companies.Add(company);
+            }
+
+            company.Name = name;
+            company.Logo = logo;
+            company.Description = "Dữ liệu công ty demo dùng để kiểm tra hiển thị logo thương hiệu.";
+            company.Location = location;
+            company.Employees = employees;
+            company.Industry = industry;
+            company.OpenJobs = 0;
+            company.Rating = rating;
+            company.Website = website;
+            company.Founded = founded;
+            company.Tags = tags;
+            company.UserId = RecruiterId;
+            company.DeletedAt = null;
+            company.VerificationStatus = CompanyVerificationStatus.Verified;
+            company.VerifiedAt = DateTime.UtcNow;
         }
 
         private static async Task<BlogAuthor> UpsertBlogAuthorAsync(

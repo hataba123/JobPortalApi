@@ -1,10 +1,15 @@
 # Nguồn asset demo
 
-`JobPortalApi/wwwroot/uploads/logo/jobportal-demo.svg` là logo giả cho `JobPortal Demo Company` trong môi trường phát triển.
+`JobPortalApi/wwwroot/uploads/logo/jobportal-demo.svg` là logo giả cho `JobPortal Demo Company` trong môi trường phát triển. Seed cũng có các công ty demo riêng, mỗi công ty dùng một logo khác nhau:
 
 - Nguồn: [Simple Icons CDN](https://cdn.jsdelivr.net/npm/simple-icons@v16/icons/simpleicons.svg)
 - Hướng dẫn CDN/bộ biểu tượng: [Simple Icons README](https://github.com/simple-icons/simple-icons/blob/develop/README.md)
-- Không đại diện cho công ty thật và không dùng cho thương mại.
+- `JobPortalApi/wwwroot/uploads/logo/company-microsoft.svg` — [Simple Icons Microsoft](https://cdn.jsdelivr.net/npm/simple-icons@latest/icons/microsoft.svg)
+- `JobPortalApi/wwwroot/uploads/logo/company-google.svg` — [Simple Icons Google](https://cdn.jsdelivr.net/npm/simple-icons@latest/icons/google.svg)
+- `JobPortalApi/wwwroot/uploads/logo/company-amazon.svg` — [Simple Icons Amazon](https://cdn.jsdelivr.net/npm/simple-icons@latest/icons/amazon.svg)
+- `JobPortalApi/wwwroot/uploads/logo/company-github.svg` — [Simple Icons GitHub](https://cdn.jsdelivr.net/npm/simple-icons@latest/icons/github.svg)
+- `JobPortalApi/wwwroot/uploads/logo/company-apple.svg` — [Simple Icons Apple](https://cdn.jsdelivr.net/npm/simple-icons@latest/icons/apple.svg)
+- Các tên công ty có hậu tố `(Demo)` để chỉ rõ đây là dữ liệu minh họa; logo thương hiệu thuộc chủ sở hữu tương ứng.
 
 ## Ảnh blog
 
