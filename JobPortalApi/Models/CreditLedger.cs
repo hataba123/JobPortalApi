@@ -17,7 +17,20 @@ public class CreditLedger
 
     public CreditType CreditType { get; set; }
 
+    public CreditLedgerEntryType EntryType { get; set; } = CreditLedgerEntryType.Grant;
+
     public int Quantity { get; set; }
+
+    [MaxLength(200)]
+    public string? IdempotencyKey { get; set; }
+
+    [MaxLength(200)]
+    public string? SourceIdempotencyKey { get; set; }
+
+    public Guid? ActorId { get; set; }
+
+    [MaxLength(500)]
+    public string? Reason { get; set; }
 
     public DateTime? ExpiresAt { get; set; }
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;

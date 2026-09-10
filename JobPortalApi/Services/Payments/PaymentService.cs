@@ -2,10 +2,13 @@ using System.Data;
 using System.Globalization;
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.Json;
 using JobPortalApi.DTOs.Payment;
 using JobPortalApi.Models;
 using JobPortalApi.Models.Enums;
+using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 
 namespace JobPortalApi.Services.Payments;
 
@@ -13,11 +16,18 @@ public class PaymentService
 {
     private readonly ApplicationDbContext _context;
     private readonly IConfiguration _configuration;
+    private readonly ILogger<PaymentService> _logger;
 
-    public PaymentService(ApplicationDbContext context, IConfiguration configuration)
+    private sealed record EntitlementSnapshot(CreditType CreditType, int Quantity, int? ExpiresInDays);
+
+    public PaymentService(
+        ApplicationDbContext context,
+        IConfiguration configuration,
+        ILogger<PaymentService> logger)
     {
         _context = context;
         _configuration = configuration;
+        _logger = logger;
     }
 
     public async Task<List<ServicePlanDto>> ListActivePlansAsync()
@@ -92,10 +102,13 @@ public class PaymentService
     {
         var plan = await _context.ServicePlans
             .AsNoTracking()
+            .Include(p => p.Entitlements)
             .FirstOrDefaultAsync(p => p.Id == request.PlanId && p.IsActive);
         if (plan == null) throw new KeyNotFoundException("Không tìm thấy gói dịch vụ đang hoạt động.");
         if (!string.Equals(plan.Currency, "VND", StringComparison.OrdinalIgnoreCase))
             throw new InvalidOperationException("VNPAY sandbox hiện chỉ hỗ trợ gói tiền tệ VND.");
+        if (plan.Price <= 0)
+            throw new InvalidOperationException("Gói dịch vụ phải có giá lớn hơn 0.");
 
         var now = DateTime.UtcNow;
         var order = new PaymentOrder
@@ -104,6 +117,10 @@ public class PaymentService
             PlanId = plan.Id,
             VnpTxnRef = $"{DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()}{Random.Shared.Next(100, 999)}",
             Amount = plan.Price,
+            PlanNameSnapshot = plan.Name,
+            PriceSnapshot = plan.Price,
+            EntitlementsSnapshot = JsonSerializer.Serialize(plan.Entitlements.Select(item =>
+                new EntitlementSnapshot(item.CreditType, item.Quantity, item.ExpiresInDays))),
             Currency = plan.Currency,
             Status = PaymentOrderStatus.Pending,
             CreatedAt = now,
@@ -119,6 +136,21 @@ public class PaymentService
     public async Task<PaymentOrderDto?> GetPaymentOrderAsync(Guid id, Guid userId, bool isAdmin)
     {
         var order = await _context.PaymentOrders.AsNoTracking().FirstOrDefaultAsync(o => o.Id == id);
+        if (order == null || (!isAdmin && order.UserId != userId)) return null;
+        return ToPaymentOrderDto(order);
+    }
+
+    public async Task<PaymentOrderDto?> GetPaymentOrderByTxnRefAsync(
+        string txnRef,
+        Guid userId,
+        bool isAdmin)
+    {
+        var normalizedTxnRef = txnRef.Trim();
+        if (normalizedTxnRef.Length == 0 || normalizedTxnRef.Length > 64) return null;
+
+        var order = await _context.PaymentOrders
+            .AsNoTracking()
+            .FirstOrDefaultAsync(item => item.VnpTxnRef == normalizedTxnRef);
         if (order == null || (!isAdmin && order.UserId != userId)) return null;
         return ToPaymentOrderDto(order);
     }
@@ -147,6 +179,7 @@ public class PaymentService
                 PlanId = o.PlanId,
                 PlanName = o.Plan != null ? o.Plan.Name : string.Empty,
                 VnpTxnRef = o.VnpTxnRef,
+                VnpTransactionNo = o.VnpTransactionNo,
                 Amount = o.Amount,
                 Currency = o.Currency,
                 Status = o.Status,
@@ -171,65 +204,152 @@ public class PaymentService
         if (!VerifyVnpay(parameters, secureHash, secret))
             return ("97", "Invalid signature");
 
-        if (!parameters.TryGetValue("vnp_TxnRef", out var txnRef) ||
-            !parameters.TryGetValue("vnp_Amount", out var amountValue) ||
-            !decimal.TryParse(amountValue, NumberStyles.Integer, CultureInfo.InvariantCulture, out var rawAmount))
+        var requiredFields = new[]
+        {
+            "vnp_TmnCode",
+            "vnp_CurrCode",
+            "vnp_Amount",
+            "vnp_TxnRef",
+            "vnp_ResponseCode",
+            "vnp_TransactionStatus",
+            "vnp_TransactionNo",
+        };
+        if (requiredFields.Any(field => !parameters.TryGetValue(field, out var value) || string.IsNullOrWhiteSpace(value)))
             return ("04", "Invalid payment data");
 
+        var transactionNo = parameters["vnp_TransactionNo"].Trim();
+        if (!IsValidVnpayTransactionNo(transactionNo))
+            return ("04", "Invalid transaction number");
+
+        var expectedTmnCode = GetRequiredSetting("VNPAY_TMN_CODE", "Vnpay:TmnCode");
+        if (!string.Equals(parameters["vnp_TmnCode"], expectedTmnCode, StringComparison.Ordinal))
+            return ("04", "Invalid merchant");
+        if (!string.Equals(parameters["vnp_CurrCode"], "VND", StringComparison.OrdinalIgnoreCase))
+            return ("04", "Invalid currency");
+        if (!decimal.TryParse(parameters["vnp_Amount"], NumberStyles.Integer, CultureInfo.InvariantCulture, out var rawAmount) ||
+            rawAmount <= 0)
+            return ("04", "Invalid amount");
+
+        var txnRef = parameters["vnp_TxnRef"].Trim();
+        var responseCode = parameters["vnp_ResponseCode"];
+        var transactionStatus = parameters["vnp_TransactionStatus"];
         var order = await _context.PaymentOrders
             .AsNoTracking()
             .FirstOrDefaultAsync(o => o.VnpTxnRef == txnRef);
         if (order == null) return ("01", "Order not found");
 
         var amount = rawAmount / 100m;
-        if (amount != order.Amount) return ("04", "Invalid amount");
-        if (order.Status == PaymentOrderStatus.Paid) return ("00", "Confirm Success");
-        if (order.Status != PaymentOrderStatus.Pending) return ("02", "Order already processed");
+        var expectedAmount = order.PriceSnapshot ?? order.Amount;
+        if (amount != expectedAmount) return ("04", "Invalid amount");
 
-        var responseCode = parameters.GetValueOrDefault("vnp_ResponseCode") ?? "99";
-        await using var transaction = await _context.Database.BeginTransactionAsync(IsolationLevel.Serializable);
-        var current = await _context.PaymentOrders
-            .Include(o => o.Plan)
-            .ThenInclude(p => p.Entitlements)
-            .FirstOrDefaultAsync(o => o.Id == order.Id);
-        if (current == null)
-            return ("01", "Order not found");
-        if (current.Status == PaymentOrderStatus.Paid)
+        var executionStrategy = _context.Database.CreateExecutionStrategy();
+        try
         {
-            await transaction.CommitAsync();
-            return ("00", "Confirm Success");
-        }
-
-        if (responseCode == "00" && current.ExpiresAt > DateTime.UtcNow)
-        {
-            current.Status = PaymentOrderStatus.Paid;
-            current.PaidAt = DateTime.UtcNow;
-            current.ProviderResponseCode = responseCode;
-            foreach (var entitlement in current.Plan.Entitlements)
+            return await executionStrategy.ExecuteAsync(async () =>
             {
-                _context.CreditLedgers.Add(new CreditLedger
-                {
-                    UserId = current.UserId,
-                    PaymentOrderId = current.Id,
-                    CreditType = entitlement.CreditType,
-                    Quantity = entitlement.Quantity,
-                    ExpiresAt = entitlement.ExpiresInDays.HasValue
-                        ? DateTime.UtcNow.AddDays(entitlement.ExpiresInDays.Value)
-                        : null,
-                });
-            }
-        }
-        else
-        {
-            current.Status = current.ExpiresAt <= DateTime.UtcNow
-                ? PaymentOrderStatus.Expired
-                : PaymentOrderStatus.Failed;
-            current.ProviderResponseCode = responseCode;
-        }
+                await using var transaction = await _context.Database.BeginTransactionAsync(IsolationLevel.Serializable);
+                var current = await _context.PaymentOrders
+                    .FirstOrDefaultAsync(o => o.Id == order.Id);
+                if (current == null)
+                    return ("01", "Order not found");
 
-        await _context.SaveChangesAsync();
-        await transaction.CommitAsync();
-        return ("00", "Confirm Success");
+                var transactionOwner = await _context.PaymentOrders
+                    .AsNoTracking()
+                    .FirstOrDefaultAsync(item => item.VnpTransactionNo == transactionNo);
+                if (transactionOwner != null && transactionOwner.Id != current.Id)
+                {
+                    _logger.LogWarning(
+                        "VNPAY transaction number is already bound to another order. PaymentOrderId={PaymentOrderId}, TxnRef={TxnRef}",
+                        current.Id,
+                        current.VnpTxnRef);
+                    return ("04", "Transaction already bound");
+                }
+
+                if (current.Status == PaymentOrderStatus.Paid)
+                {
+                    if (string.Equals(current.VnpTransactionNo, transactionNo, StringComparison.Ordinal))
+                    {
+                        await transaction.CommitAsync();
+                        return ("00", "Confirm Success");
+                    }
+
+                    _logger.LogWarning(
+                        "VNPAY transaction binding mismatch for paid order. PaymentOrderId={PaymentOrderId}, TxnRef={TxnRef}",
+                        current.Id,
+                        current.VnpTxnRef);
+                    return ("04", "Transaction does not match order");
+                }
+
+                if (current.Status != PaymentOrderStatus.Pending)
+                    return ("02", "Order already processed");
+
+                var now = DateTime.UtcNow;
+                if (responseCode == "00" && transactionStatus == "00" && current.ExpiresAt > now)
+                {
+                    List<EntitlementSnapshot>? snapshots;
+                    try
+                    {
+                        snapshots = string.IsNullOrWhiteSpace(current.EntitlementsSnapshot)
+                            ? null
+                            : JsonSerializer.Deserialize<List<EntitlementSnapshot>>(current.EntitlementsSnapshot);
+                    }
+                    catch (JsonException)
+                    {
+                        snapshots = null;
+                    }
+
+                    if (snapshots is not { Count: > 0 } ||
+                        snapshots.Any(item => item.Quantity <= 0 || (item.ExpiresInDays.HasValue && item.ExpiresInDays <= 0)) ||
+                        snapshots.Select(item => item.CreditType).Distinct().Count() != snapshots.Count)
+                    {
+                        current.Status = PaymentOrderStatus.Failed;
+                        current.ProviderResponseCode = "98";
+                        await _context.SaveChangesAsync();
+                        await transaction.CommitAsync();
+                        return ("04", "Order entitlement snapshot is invalid");
+                    }
+
+                    current.Status = PaymentOrderStatus.Paid;
+                    current.PaidAt = now;
+                    current.ProviderResponseCode = responseCode;
+                    current.VnpTransactionNo = transactionNo;
+                    foreach (var entitlement in snapshots)
+                    {
+                        _context.CreditLedgers.Add(new CreditLedger
+                        {
+                            UserId = current.UserId,
+                            PaymentOrderId = current.Id,
+                            CreditType = entitlement.CreditType,
+                            EntryType = CreditLedgerEntryType.Grant,
+                            IdempotencyKey = $"payment:{current.Id}:{entitlement.CreditType}",
+                            Quantity = entitlement.Quantity,
+                            ExpiresAt = entitlement.ExpiresInDays.HasValue
+                                ? now.AddDays(entitlement.ExpiresInDays.Value)
+                                : null,
+                        });
+                    }
+                }
+                else
+                {
+                    current.Status = current.ExpiresAt <= DateTime.UtcNow
+                        ? PaymentOrderStatus.Expired
+                        : PaymentOrderStatus.Failed;
+                    current.ProviderResponseCode = responseCode;
+                }
+
+                await _context.SaveChangesAsync();
+                await transaction.CommitAsync();
+                return ("00", "Confirm Success");
+            });
+        }
+        catch (DbUpdateException exception) when (IsUniqueConstraintViolation(exception))
+        {
+            _logger.LogWarning(
+                exception,
+                "VNPAY transaction number could not be bound because it is already in use. TxnRef={TxnRef}",
+                txnRef);
+            return ("04", "Transaction already bound");
+        }
     }
 
     public async Task<CreditBalanceDto> GetBalanceAsync(Guid userId)
@@ -255,6 +375,7 @@ public class PaymentService
             {
                 Id = entry.Id,
                 CreditType = entry.CreditType,
+                EntryType = entry.EntryType,
                 Quantity = entry.Quantity,
                 ExpiresAt = entry.ExpiresAt,
                 CreatedAt = entry.CreatedAt,
@@ -345,6 +466,7 @@ public class PaymentService
         Id = order.Id,
         PlanId = order.PlanId,
         VnpTxnRef = order.VnpTxnRef,
+        VnpTransactionNo = order.VnpTransactionNo,
         Amount = order.Amount,
         Currency = order.Currency,
         Status = order.Status,
@@ -368,6 +490,13 @@ public class PaymentService
         if (items.Count == 0 || items.Select(item => item.CreditType).Distinct().Count() != items.Count)
             throw new ArgumentException("Mỗi loại tín dụng chỉ được khai báo một lần trong gói.");
     }
+
+    private static bool IsValidVnpayTransactionNo(string value) =>
+        value.Length is > 0 and <= 64 && value.All(character => character is >= '0' and <= '9');
+
+    private static bool IsUniqueConstraintViolation(DbUpdateException exception) =>
+        exception.InnerException is SqlException sqlException &&
+        (sqlException.Number == 2601 || sqlException.Number == 2627);
 
     private string GetRequiredSetting(string environmentKey, string configurationKey)
     {

@@ -76,6 +76,7 @@ public class PaymentOrderDto
     public Guid Id { get; set; }
     public Guid PlanId { get; set; }
     public string VnpTxnRef { get; set; } = string.Empty;
+    public string? VnpTransactionNo { get; set; }
     public decimal Amount { get; set; }
     public string Currency { get; set; } = "VND";
     public PaymentOrderStatus Status { get; set; }
@@ -94,6 +95,7 @@ public class PaymentOrderListItemDto
     public Guid PlanId { get; set; }
     public string PlanName { get; set; } = string.Empty;
     public string VnpTxnRef { get; set; } = string.Empty;
+    public string? VnpTransactionNo { get; set; }
     public decimal Amount { get; set; }
     public string Currency { get; set; } = "VND";
     public PaymentOrderStatus Status { get; set; }
@@ -107,6 +109,7 @@ public class CreditLedgerDto
 {
     public Guid Id { get; set; }
     public CreditType CreditType { get; set; }
+    public CreditLedgerEntryType EntryType { get; set; }
     public int Quantity { get; set; }
     public DateTime? ExpiresAt { get; set; }
     public DateTime CreatedAt { get; set; }
@@ -116,4 +119,41 @@ public class CreditLedgerDto
 public class CreditBalanceDto
 {
     public Dictionary<CreditType, int> Balances { get; set; } = new();
+}
+
+public class CreditRefundRequest
+{
+    [Required]
+    public Guid UserId { get; set; }
+
+    public CreditType CreditType { get; set; }
+
+    [Range(1, int.MaxValue)]
+    public int Quantity { get; set; }
+
+    [Required, MaxLength(200)]
+    public string SourceIdempotencyKey { get; set; } = string.Empty;
+
+    [Required, MaxLength(200)]
+    public string IdempotencyKey { get; set; } = string.Empty;
+
+    [MaxLength(500)]
+    public string? Reason { get; set; }
+}
+
+public class CreditAdjustmentRequest
+{
+    [Required]
+    public Guid UserId { get; set; }
+
+    public CreditType CreditType { get; set; }
+
+    [Range(-2147483648, 2147483647)]
+    public int Quantity { get; set; }
+
+    [Required, MaxLength(200)]
+    public string IdempotencyKey { get; set; } = string.Empty;
+
+    [Required, MaxLength(500)]
+    public string Reason { get; set; } = string.Empty;
 }

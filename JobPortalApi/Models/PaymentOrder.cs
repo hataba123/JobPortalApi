@@ -19,8 +19,21 @@ public class PaymentOrder
     [Required, MaxLength(64)]
     public string VnpTxnRef { get; set; } = string.Empty;
 
+    [MaxLength(64)]
+    public string? VnpTransactionNo { get; set; }
+
     [Column(TypeName = "decimal(18,2)")]
     public decimal Amount { get; set; }
+
+    // Giữ nguyên thông tin gói tại thời điểm tạo đơn; IPN không được tính lại
+    // entitlement từ ServicePlan hiện tại sau khi admin chỉnh sửa gói.
+    [MaxLength(120)]
+    public string? PlanNameSnapshot { get; set; }
+
+    [Column(TypeName = "decimal(18,2)")]
+    public decimal? PriceSnapshot { get; set; }
+
+    public string? EntitlementsSnapshot { get; set; }
 
     [Required, MaxLength(10)]
     public string Currency { get; set; } = "VND";

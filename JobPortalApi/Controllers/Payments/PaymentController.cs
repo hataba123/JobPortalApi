@@ -13,10 +13,12 @@ namespace JobPortalApi.Controllers.Payments;
 public class PaymentController : ControllerBase
 {
     private readonly PaymentService _paymentService;
+    private readonly CreditLedgerService _creditLedgerService;
 
-    public PaymentController(PaymentService paymentService)
+    public PaymentController(PaymentService paymentService, CreditLedgerService creditLedgerService)
     {
         _paymentService = paymentService;
+        _creditLedgerService = creditLedgerService;
     }
 
     [HttpGet("plans")]
@@ -90,6 +92,17 @@ public class PaymentController : ControllerBase
         return result == null ? NotFound() : Ok(result);
     }
 
+    [HttpGet("payment-orders/by-txn-ref/{txnRef}")]
+    [Authorize(Roles = "Admin,Recruiter")]
+    public async Task<IActionResult> GetPaymentOrderByTxnRef(string txnRef)
+    {
+        var result = await _paymentService.GetPaymentOrderByTxnRefAsync(
+            txnRef,
+            GetUserId(),
+            User.IsInRole("Admin"));
+        return result == null ? NotFound() : Ok(result);
+    }
+
     [HttpGet("admin/payment-orders")]
     [Authorize(Roles = "Admin")]
     public async Task<IActionResult> GetAllPaymentOrders()
@@ -132,6 +145,53 @@ public class PaymentController : ControllerBase
     public async Task<IActionResult> GetLedger()
     {
         return Ok(await _paymentService.GetLedgerAsync(GetUserId()));
+    }
+
+    [HttpPost("admin/credits/refund")]
+    [Authorize(Roles = "Admin")]
+    public async Task<IActionResult> RefundCredit([FromBody] CreditRefundRequest request)
+    {
+        try
+        {
+            var refunded = await _creditLedgerService.TryRefundAsync(
+                request.UserId,
+                request.CreditType,
+                request.Quantity,
+                request.IdempotencyKey,
+                request.SourceIdempotencyKey,
+                actorId: GetUserId(),
+                reason: request.Reason);
+            return refunded
+                ? Ok(new { success = true })
+                : Conflict(new { message = "Debit không tồn tại, đã refund hoặc dữ liệu refund không hợp lệ." });
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+    }
+
+    [HttpPost("admin/credits/adjustment")]
+    [Authorize(Roles = "Admin")]
+    public async Task<IActionResult> AdjustCredit([FromBody] CreditAdjustmentRequest request)
+    {
+        try
+        {
+            var adjusted = await _creditLedgerService.TryAdjustAsync(
+                request.UserId,
+                request.CreditType,
+                request.Quantity,
+                request.IdempotencyKey,
+                GetUserId(),
+                request.Reason);
+            return adjusted
+                ? Ok(new { success = true })
+                : Conflict(new { message = "Adjustment bị từ chối vì làm số dư âm hoặc idempotency payload không khớp." });
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
     }
 
     private Guid GetUserId()

@@ -69,6 +69,13 @@ public class ApplicationDbContext : DbContext
         modelBuilder.Entity<User>()
             .HasQueryFilter(user => user.DeletedAt == null)
             .HasIndex(user => user.DeletedAt);
+        modelBuilder.Entity<User>()
+            .HasIndex(user => user.Email)
+            .IsUnique();
+
+        modelBuilder.Entity<CandidateProfile>()
+            .HasIndex(profile => profile.UserId)
+            .IsUnique();
 
         modelBuilder.Entity<Company>()
             .HasQueryFilter(company => company.DeletedAt == null)
@@ -160,6 +167,10 @@ public class ApplicationDbContext : DbContext
             .IsUnique()
             .HasFilter("[SourceMessageId] IS NOT NULL");
 
+        modelBuilder.Entity<BlogLike>()
+            .HasIndex(like => new { like.UserId, like.BlogId })
+            .IsUnique();
+
         modelBuilder.Entity<NewsletterSubscription>()
             .HasIndex(subscription => subscription.UserId)
             .IsUnique();
@@ -234,6 +245,10 @@ public class ApplicationDbContext : DbContext
             .HasIndex(order => order.VnpTxnRef)
             .IsUnique();
         modelBuilder.Entity<PaymentOrder>()
+            .HasIndex(order => order.VnpTransactionNo)
+            .IsUnique()
+            .HasFilter("[VnpTransactionNo] IS NOT NULL");
+        modelBuilder.Entity<PaymentOrder>()
             .HasIndex(order => new { order.UserId, order.CreatedAt });
         modelBuilder.Entity<PaymentOrder>()
             .HasIndex(order => new { order.Status, order.ExpiresAt });
@@ -253,6 +268,12 @@ public class ApplicationDbContext : DbContext
             .IsUnique();
         modelBuilder.Entity<CreditLedger>()
             .HasIndex(entry => new { entry.UserId, entry.CreditType, entry.ExpiresAt });
+        modelBuilder.Entity<CreditLedger>()
+            .HasIndex(entry => entry.IdempotencyKey)
+            .IsUnique()
+            .HasFilter("[IdempotencyKey] IS NOT NULL");
+        modelBuilder.Entity<CreditLedger>()
+            .HasIndex(entry => entry.SourceIdempotencyKey);
         modelBuilder.Entity<CreditLedger>()
             .HasOne(entry => entry.User)
             .WithMany()
