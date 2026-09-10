@@ -128,6 +128,9 @@ namespace JobPortalApi.Services.User
 
         public async Task<JobPostDto?> UpdateAsync(Guid id, UpdateJobPostDto dto, Guid employerId, byte[]? expectedVersion = null)
         {
+            if (dto.Status.HasValue && dto.Status is not (JobPostStatus.Draft or JobPostStatus.PendingApproval))
+                throw new ArgumentException("Recruiter chỉ được giữ tin ở trạng thái Draft hoặc PendingApproval; Admin phải duyệt để phát hành.");
+
             var job = await _context.JobPosts
                 .FirstOrDefaultAsync(j => j.Id == id && j.EmployerId == employerId);
             if (job == null) return null;
