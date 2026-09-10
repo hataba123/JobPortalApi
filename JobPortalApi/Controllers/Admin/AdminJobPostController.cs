@@ -2,6 +2,8 @@
 using JobPortalApi.Services.Interface.Admin;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using JobPortalApi.Services.Infrastructure;
+using JobPortalApi.DTOs.Shared;
 
 namespace JobPortalApi.Controllers.Admin
 {
@@ -14,11 +16,16 @@ namespace JobPortalApi.Controllers.Admin
         public AdminJobPostController(IJobPostService jobPostService) => _jobPostService = jobPostService;
 
         [HttpGet]
-        public async Task<IActionResult> GetAll() => Ok(await _jobPostService.GetAllJobPostsAsync());
+        public async Task<IActionResult> GetAll([FromQuery] PagedQuery query) => Ok(await _jobPostService.GetAllJobPostsAsync(query));
 
         [HttpGet("{id}")]
         public async Task<IActionResult> GetById(Guid id)
-            => (await _jobPostService.GetJobPostByIdAsync(id)) is var j && j != null ? Ok(j) : NotFound();
+        {
+            var job = await _jobPostService.GetJobPostByIdAsync(id);
+            if (job == null) return NotFound();
+            Response.Headers.ETag = $"\"{job.Version}\"";
+            return Ok(job);
+        }
 
         [HttpPost]
         public async Task<IActionResult> Create([FromBody] CreateJobPostDto dto)
@@ -28,11 +35,25 @@ namespace JobPortalApi.Controllers.Admin
         }
 
         [HttpPut("{id}")]
-        public async Task<IActionResult> Update(Guid id, [FromBody] UpdateJobPostDto dto)
-            => await _jobPostService.UpdateJobPostAsync(id, dto) ? NoContent() : NotFound();
+        public async Task<IActionResult> Update(Guid id, [FromBody] UpdateJobPostDto dto, [FromHeader(Name = "If-Match")] string? ifMatch)
+        {
+            var version = ReadRequiredVersion(ifMatch);
+            if (version == null) return StatusCode(StatusCodes.Status428PreconditionRequired);
+            if (!await _jobPostService.UpdateJobPostAsync(id, dto, version)) return NotFound();
+            var updated = await _jobPostService.GetJobPostByIdAsync(id);
+            if (updated != null) Response.Headers.ETag = $"\"{updated.Version}\"";
+            return NoContent();
+        }
 
         [HttpDelete("{id}")]
-        public async Task<IActionResult> Delete(Guid id)
-            => await _jobPostService.DeleteJobPostAsync(id) ? NoContent() : NotFound();
+        public async Task<IActionResult> Delete(Guid id, [FromHeader(Name = "If-Match")] string? ifMatch)
+        {
+            var version = ReadRequiredVersion(ifMatch);
+            if (version == null) return StatusCode(StatusCodes.Status428PreconditionRequired);
+            return await _jobPostService.DeleteJobPostAsync(id, version) ? NoContent() : NotFound();
+        }
+
+        private static byte[]? ReadRequiredVersion(string? value) =>
+            string.IsNullOrWhiteSpace(value) ? null : ConcurrencyToken.Decode(value.Trim());
     }
 }

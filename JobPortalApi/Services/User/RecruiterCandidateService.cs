@@ -7,6 +7,8 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using System.Security.Claims;
+using JobPortalApi.DTOs.Shared;
+using JobPortalApi.Services.Infrastructure;
 
 namespace JobPortalApi.Services.User
 {
@@ -21,44 +23,79 @@ namespace JobPortalApi.Services.User
 
         public async Task<IEnumerable<CandidateProfileBriefDto>> SearchCandidatesAsync(Guid recruiterId, CandidateSearchRequest request)
         {
-            var query = _context.candidateProfiles
-                .Include(c => c.User)
-                .AsQueryable();
+            var result = await SearchCandidatesPagedAsync(recruiterId, request);
+            return result.Items;
+        }
 
-            if (!string.IsNullOrEmpty(request.Keyword))
+        public async Task<PagedResultDto<CandidateProfileBriefDto>> SearchCandidatesPagedAsync(Guid recruiterId, CandidateSearchRequest request)
+        {
+            var page = Math.Max(1, request.Page);
+            var pageSize = Math.Clamp(request.PageSize, 1, 100);
+            var query = _context.candidateProfiles.AsNoTracking();
+
+            if (!string.IsNullOrWhiteSpace(request.Keyword))
             {
-                query = query.Where(c => c.User.FullName.Contains(request.Keyword));
+                var keyword = request.Keyword.Trim();
+                query = query.Where(c => c.User.FullName.Contains(keyword) || c.User.Email.Contains(keyword));
             }
 
-            if (!string.IsNullOrEmpty(request.Skill))
+            if (!string.IsNullOrWhiteSpace(request.Skill))
             {
-                query = query.Where(c => c.Skills.Contains(request.Skill));
+                var normalized = request.Skill.Trim().ToUpper();
+                query = query.Where(c => _context.CandidateSkills.Any(skill =>
+                    skill.CandidateProfileId == c.Id && skill.NormalizedName == normalized) ||
+                    (c.Skills != null && c.Skills.Contains(request.Skill.Trim())));
             }
 
-            if (!string.IsNullOrEmpty(request.Education))
-            {
-                query = query.Where(c => c.Education.Contains(request.Education));
-            }
+            if (!string.IsNullOrWhiteSpace(request.Education))
+                query = query.Where(c => c.Education != null && c.Education.Contains(request.Education.Trim()));
+            if (!string.IsNullOrWhiteSpace(request.Location))
+                query = query.Where(c => c.PreferredLocation != null && c.PreferredLocation.Contains(request.Location.Trim()));
 
-            if (request.MinYearsExperience.HasValue)
-            {
-                query = query.Where(c => c.Experience != null &&
-                    c.Experience.Contains(request.MinYearsExperience.Value.ToString()));
-            }
+            var experienceFrom = request.ExperienceFrom ?? request.MinYearsExperience;
+            if (experienceFrom.HasValue)
+                query = query.Where(c => c.ExperienceYears >= experienceFrom.Value);
+            if (request.ExperienceTo.HasValue)
+                query = query.Where(c => c.ExperienceYears <= request.ExperienceTo.Value);
 
-            return await query.Select(c => new CandidateProfileBriefDto
+            var total = await query.CountAsync();
+            var ordered = string.Equals(request.SortDir, "asc", StringComparison.OrdinalIgnoreCase)
+                ? request.SortBy?.ToLowerInvariant() switch
+                {
+                    "experience" => query.OrderBy(c => c.ExperienceYears),
+                    "name" => query.OrderBy(c => c.User.FullName),
+                    "location" => query.OrderBy(c => c.PreferredLocation),
+                    _ => query.OrderBy(c => c.Id)
+                }
+                : request.SortBy?.ToLowerInvariant() switch
+                {
+                    "experience" => query.OrderByDescending(c => c.ExperienceYears),
+                    "name" => query.OrderByDescending(c => c.User.FullName),
+                    "location" => query.OrderByDescending(c => c.PreferredLocation),
+                    _ => query.OrderByDescending(c => c.Id)
+                };
+
+            var items = await ordered.ThenBy(c => c.Id)
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
+                .Select(c => new CandidateProfileBriefDto
+                {
+                    Id = c.Id,
+                    UserId = c.UserId,
+                    FullName = c.User.FullName,
+                    Skills = c.Skills,
+                    Experience = c.Experience,
+                    ExperienceYears = c.ExperienceYears,
+                    Education = c.Education,
+                    PreferredLocation = c.PreferredLocation,
+                    PreferredJobType = c.PreferredJobType,
+                    ExpectedSalary = c.ExpectedSalary
+                }).ToListAsync();
+
+            return new PagedResultDto<CandidateProfileBriefDto>
             {
-                Id = c.Id,
-                UserId = c.UserId,
-                FullName = c.User.FullName,
-                Skills = c.Skills,
-                Experience = c.Experience,
-                ExperienceYears = c.ExperienceYears,
-                Education = c.Education,
-                PreferredLocation = c.PreferredLocation,
-                PreferredJobType = c.PreferredJobType,
-                ExpectedSalary = c.ExpectedSalary
-            }).ToListAsync();
+                Items = items, TotalCount = total, Page = page, PageSize = pageSize
+            };
         }
 
         public async Task<CandidateProfileDetailDto?> GetCandidateByIdAsync(Guid recruiterId, Guid candidateId)
@@ -109,9 +146,40 @@ namespace JobPortalApi.Services.User
                     JobTitle = j.JobPost.Title,
                     AppliedAt = j.AppliedAt,
                     CVUrl = j.CVUrl,
-                    Status = j.Status
+                    Status = j.Status,
+                    Version = ConcurrencyToken.Encode(j.RowVersion)
                 })
                 .ToListAsync();
+        }
+
+        public async Task<PagedResultDto<CandidateApplicationDto>> GetCandidateApplicationsPagedAsync(
+            Guid recruiterId, Guid candidateId, PagedQuery request)
+        {
+            var page = Math.Max(1, request.Page);
+            var pageSize = Math.Clamp(request.PageSize, 1, 100);
+            var query = _context.Jobs.AsNoTracking()
+                .Where(j => j.CandidateId == candidateId && j.JobPost.EmployerId == recruiterId);
+            var total = await query.CountAsync();
+            var items = await query
+                .OrderByDescending(j => j.AppliedAt)
+                .ThenBy(j => j.Id)
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
+                .Select(j => new CandidateApplicationDto
+                {
+                    JobId = j.Id,
+                    JobPostId = j.JobPostId,
+                    JobTitle = j.JobPost.Title,
+                    AppliedAt = j.AppliedAt,
+                    CVUrl = j.CVUrl,
+                    Status = j.Status,
+                    Version = ConcurrencyToken.Encode(j.RowVersion)
+                })
+                .ToListAsync();
+            return new PagedResultDto<CandidateApplicationDto>
+            {
+                Items = items, TotalCount = total, Page = page, PageSize = pageSize
+            };
         }
 
         public async Task<IEnumerable<CandidateProfileBriefDto>> GetCandidatesForRecruiterAsync(Guid recruiterId)
@@ -142,6 +210,47 @@ namespace JobPortalApi.Services.User
                     PreferredJobType = c.PreferredJobType,
                     ExpectedSalary = c.ExpectedSalary
                 }).ToListAsync();
+        }
+
+        public async Task<PagedResultDto<CandidateProfileBriefDto>> GetCandidatesForRecruiterPagedAsync(
+            Guid recruiterId, PagedQuery request)
+        {
+            var page = Math.Max(1, request.Page);
+            var pageSize = Math.Clamp(request.PageSize, 1, 100);
+            var candidateIds = _context.Jobs
+                .Where(j => j.JobPost.EmployerId == recruiterId)
+                .Select(j => j.CandidateId)
+                .Distinct();
+            var query = _context.candidateProfiles.AsNoTracking()
+                .Where(c => candidateIds.Contains(c.UserId));
+            if (!string.IsNullOrWhiteSpace(request.Search))
+            {
+                var search = request.Search.Trim();
+                query = query.Where(c => c.User.FullName.Contains(search) || c.User.Email.Contains(search));
+            }
+            var total = await query.CountAsync();
+            var items = await query
+                .OrderBy(c => c.User.FullName)
+                .ThenBy(c => c.Id)
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
+                .Select(c => new CandidateProfileBriefDto
+                {
+                    Id = c.Id,
+                    UserId = c.UserId,
+                    FullName = c.User.FullName,
+                    Skills = c.Skills,
+                    Experience = c.Experience,
+                    ExperienceYears = c.ExperienceYears,
+                    Education = c.Education,
+                    PreferredLocation = c.PreferredLocation,
+                    PreferredJobType = c.PreferredJobType,
+                    ExpectedSalary = c.ExpectedSalary
+                }).ToListAsync();
+            return new PagedResultDto<CandidateProfileBriefDto>
+            {
+                Items = items, TotalCount = total, Page = page, PageSize = pageSize
+            };
         }
 
         public async Task<CandidateProfileDetailDto?> GetByUserIdAsync(Guid userId)
@@ -196,6 +305,7 @@ namespace JobPortalApi.Services.User
             profile.GithubUrl = dto.GithubUrl;
             profile.Certificates = dto.Certificates;
             profile.Summary = dto.Summary;
+            await SyncCandidateSkillsAsync(profile);
             // Nếu có FullName hoặc Email thì cập nhật vào User
             if (!string.IsNullOrEmpty(dto.FullName))
                 profile.User.FullName = dto.FullName;
@@ -253,6 +363,25 @@ namespace JobPortalApi.Services.User
             await _context.SaveChangesAsync();
 
             return true;
+        }
+
+        private async Task SyncCandidateSkillsAsync(CandidateProfile profile)
+        {
+            var existing = await _context.CandidateSkills
+                .Where(skill => skill.CandidateProfileId == profile.Id)
+                .ToListAsync();
+            _context.CandidateSkills.RemoveRange(existing);
+            var skills = (profile.Skills ?? string.Empty)
+                .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                .Select(skill => skill.Trim())
+                .Where(skill => skill.Length > 0)
+                .GroupBy(skill => skill.ToUpperInvariant())
+                .Select(group => new CandidateSkill
+                {
+                    Id = Guid.NewGuid(), CandidateProfileId = profile.Id,
+                    NormalizedName = group.Key, DisplayName = group.First()
+                });
+            await _context.CandidateSkills.AddRangeAsync(skills);
         }
 
         public async Task<(byte[] Content, string FileName)?> GetCvAsync(Guid actorId, Guid candidateId, bool isAdmin = false)

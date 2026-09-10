@@ -3,6 +3,8 @@ using JobPortalApi.DTOs.Shared;
 using JobPortalApi.Models;
 using JobPortalApi.Models.Enums;
 using JobPortalApi.Services.Interface.User;
+using JobPortalApi.Services.Infrastructure;
+using JobPortalApi.Middleware;
 using Microsoft.EntityFrameworkCore;
 
 namespace JobPortalApi.Services.User
@@ -22,15 +24,21 @@ namespace JobPortalApi.Services.User
             pageSize = Math.Clamp(pageSize, 1, 100);
             var query = ActivePosts(_context.JobPosts);
             var total = await query.CountAsync();
-            var items = await Project(query)
+            var entities = await query
+                .AsNoTracking()
+                .Include(j => j.Category)
+                .Include(j => j.Company)
                 .OrderByDescending(j => j.CreatedAt)
+                .ThenBy(j => j.Id)
                 .Skip((page - 1) * pageSize)
                 .Take(pageSize)
                 .ToListAsync();
+            var items = entities.Select(ToDto).ToList();
             return new PagedResponse<JobPostDto>
             {
                 Items = items,
                 Total = total,
+                TotalCount = total,
                 Page = page,
                 PageSize = pageSize,
                 TotalPages = (int)Math.Ceiling(total / (double)pageSize)
@@ -39,29 +47,48 @@ namespace JobPortalApi.Services.User
 
         public async Task<JobPostDto?> GetByIdAsync(Guid id)
         {
-            return await Project(ActivePosts(_context.JobPosts.Where(j => j.Id == id)))
+            var entity = await ActivePosts(_context.JobPosts.Where(j => j.Id == id))
+                .Include(j => j.Category)
+                .Include(j => j.Company)
+                .AsNoTracking()
                 .FirstOrDefaultAsync();
+            return entity == null ? null : ToDto(entity);
         }
 
         public async Task<IEnumerable<JobPostDto>> GetByCompanyIdAsync(Guid companyId)
         {
-            return await Project(ActivePosts(_context.JobPosts.Where(j => j.CompanyId == companyId)))
+            var entities = await ActivePosts(_context.JobPosts.Where(j => j.CompanyId == companyId))
+                .Include(j => j.Category)
+                .Include(j => j.Company)
+                .AsNoTracking()
                 .OrderByDescending(j => j.CreatedAt)
+                .ThenBy(j => j.Id)
                 .ToListAsync();
+            return entities.Select(ToDto).ToList();
         }
 
         public async Task<IEnumerable<JobPostDto>> GetByCategoryIdAsync(Guid categoryId)
         {
-            return await Project(ActivePosts(_context.JobPosts.Where(j => j.CategoryId == categoryId)))
+            var entities = await ActivePosts(_context.JobPosts.Where(j => j.CategoryId == categoryId))
+                .Include(j => j.Category)
+                .Include(j => j.Company)
+                .AsNoTracking()
                 .OrderByDescending(j => j.CreatedAt)
+                .ThenBy(j => j.Id)
                 .ToListAsync();
+            return entities.Select(ToDto).ToList();
         }
 
         public async Task<IEnumerable<JobPostDto>> GetByEmployerIdAsync(Guid employerId)
         {
-            return await Project(_context.JobPosts.Where(j => j.EmployerId == employerId))
+            var entities = await _context.JobPosts.Where(j => j.EmployerId == employerId)
+                .Include(j => j.Category)
+                .Include(j => j.Company)
+                .AsNoTracking()
                 .OrderByDescending(j => j.CreatedAt)
+                .ThenBy(j => j.Id)
                 .ToListAsync();
+            return entities.Select(ToDto).ToList();
         }
 
         public async Task<JobPostDto> CreateAsync(CreateJobPostDto dto, Guid employerId)
@@ -99,11 +126,13 @@ namespace JobPortalApi.Services.User
                 ?? throw new InvalidOperationException("Không thể đọc lại tin tuyển dụng vừa tạo.");
         }
 
-        public async Task<JobPostDto?> UpdateAsync(Guid id, UpdateJobPostDto dto, Guid employerId)
+        public async Task<JobPostDto?> UpdateAsync(Guid id, UpdateJobPostDto dto, Guid employerId, byte[]? expectedVersion = null)
         {
             var job = await _context.JobPosts
                 .FirstOrDefaultAsync(j => j.Id == id && j.EmployerId == employerId);
             if (job == null) return null;
+            if (expectedVersion is { Length: > 0 })
+                _context.Entry(job).Property(post => post.RowVersion).OriginalValue = expectedVersion;
 
             job.Title = dto.Title;
             job.Description = dto.Description;
@@ -123,26 +152,39 @@ namespace JobPortalApi.Services.User
             if (dto.Status.HasValue)
                 job.Status = dto.Status.Value;
 
-            await _context.SaveChangesAsync();
+            try { await _context.SaveChangesAsync(); }
+            catch (DbUpdateConcurrencyException)
+            {
+                throw new ApiConflictException("Tin tuyển dụng đã được cập nhật bởi người khác. Vui lòng tải lại.", "CONCURRENCY_CONFLICT");
+            }
             return await GetForManagementAsync(job.Id);
         }
 
-        public async Task<bool> DeleteAsync(Guid id, Guid employerId)
+        public async Task<bool> DeleteAsync(Guid id, Guid employerId, byte[]? expectedVersion = null)
         {
             var post = await _context.JobPosts
                 .FirstOrDefaultAsync(j => j.Id == id && j.EmployerId == employerId);
             if (post == null) return false;
+            if (expectedVersion is { Length: > 0 })
+                _context.Entry(post).Property(item => item.RowVersion).OriginalValue = expectedVersion;
 
             post.DeletedAt = DateTime.UtcNow;
             post.Status = JobPostStatus.Closed;
-            await _context.SaveChangesAsync();
+            try { await _context.SaveChangesAsync(); }
+            catch (DbUpdateConcurrencyException)
+            {
+                throw new ApiConflictException("Tin tuyển dụng đã được cập nhật bởi người khác. Vui lòng tải lại.", "CONCURRENCY_CONFLICT");
+            }
             return true;
         }
 
         private async Task<JobPostDto?> GetForManagementAsync(Guid id)
         {
-            return await Project(_context.JobPosts.Where(j => j.Id == id))
-                .FirstOrDefaultAsync();
+            var entity = await _context.JobPosts
+                .Include(j => j.Category)
+                .Include(j => j.Company)
+                .FirstOrDefaultAsync(j => j.Id == id);
+            return entity == null ? null : ToDto(entity);
         }
 
         private static IQueryable<JobPost> ActivePosts(IQueryable<JobPost> query)
@@ -152,9 +194,9 @@ namespace JobPortalApi.Services.User
                 (!j.ExpiresAt.HasValue || j.ExpiresAt > now));
         }
 
-        private static IQueryable<JobPostDto> Project(IQueryable<JobPost> query)
+        private static JobPostDto ToDto(JobPost j)
         {
-            return query.Select(j => new JobPostDto
+            return new JobPostDto
             {
                 Id = j.Id,
                 Title = j.Title,
@@ -171,8 +213,9 @@ namespace JobPortalApi.Services.User
                 MinExperienceYears = j.MinExperienceYears,
                 EducationRequirement = j.EducationRequirement,
                 CategoryName = j.Category != null ? j.Category.Name : "",
-                CompanyName = j.Company != null ? j.Company.Name : ""
-            });
+                CompanyName = j.Company != null ? j.Company.Name : "",
+                Version = ConcurrencyToken.Encode(j.RowVersion)
+            };
         }
     }
 }

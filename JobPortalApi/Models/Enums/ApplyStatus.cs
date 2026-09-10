@@ -2,9 +2,12 @@
 {
     public enum ApplyStatus
     {
-        Pending,
-        Reviewed,
-        Accepted,
-        Rejected
+        Applied,
+        Screening,
+        Interview,
+        Offer,
+        Hired,
+        Rejected,
+        Withdrawn
     }
 }

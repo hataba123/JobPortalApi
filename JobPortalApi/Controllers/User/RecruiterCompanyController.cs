@@ -1,5 +1,6 @@
 ﻿using JobPortalApi.DTOs.AdminCompany;
 using JobPortalApi.Services.Interface.User;
+using JobPortalApi.Services.Infrastructure;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -27,15 +28,18 @@ namespace JobPortalApi.Controllers.User
             if (company == null)
                 return NotFound("Không tìm thấy công ty mà bạn đang quản lý.");
 
+            Response.Headers.ETag = $"\"{company.Version}\"";
             return Ok(company);
         }
 
         // PUT: api/recruiter/company
         [HttpPut]
-        public async Task<IActionResult> UpdateMyCompany([FromBody] UpdateCompanyDto dto)
+        public async Task<IActionResult> UpdateMyCompany([FromBody] UpdateCompanyDto dto, [FromHeader(Name = "If-Match")] string? ifMatch)
         {
+            var version = string.IsNullOrWhiteSpace(ifMatch) ? null : ConcurrencyToken.Decode(ifMatch.Trim());
+            if (version == null) return StatusCode(StatusCodes.Status428PreconditionRequired);
             var recruiterId = GetCurrentUserId();
-            var success = await _companyService.UpdateMyCompanyAsync(recruiterId, dto);
+            var success = await _companyService.UpdateMyCompanyAsync(recruiterId, dto, version);
 
             if (!success)
                 return NotFound("Không thể cập nhật vì không tìm thấy công ty phù hợp hoặc bạn không có quyền.");
@@ -45,10 +49,12 @@ namespace JobPortalApi.Controllers.User
 
         // DELETE: api/recruiter/company
         [HttpDelete]
-        public async Task<IActionResult> DeleteMyCompany()
+        public async Task<IActionResult> DeleteMyCompany([FromHeader(Name = "If-Match")] string? ifMatch)
         {
+            var version = string.IsNullOrWhiteSpace(ifMatch) ? null : ConcurrencyToken.Decode(ifMatch.Trim());
+            if (version == null) return StatusCode(StatusCodes.Status428PreconditionRequired);
             var recruiterId = GetCurrentUserId();
-            var success = await _companyService.DeleteMyCompanyAsync(recruiterId);
+            var success = await _companyService.DeleteMyCompanyAsync(recruiterId, version);
 
             if (!success)
                 return BadRequest("Không thể xoá công ty (có thể do còn bài đăng tuyển dụng hoặc bạn không có quyền).");

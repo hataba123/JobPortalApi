@@ -13,5 +13,6 @@ namespace JobPortalApi.DTOs.Apply
         public decimal Salary { get; set; }
         public DateTime AppliedAt { get; set; }
         public ApplyStatus Status { get; set; }
+        public string Version { get; set; } = string.Empty;
     }
 }

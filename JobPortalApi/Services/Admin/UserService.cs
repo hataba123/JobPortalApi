@@ -5,6 +5,7 @@ using Microsoft.EntityFrameworkCore;
 using JobPortalApi.Models;
 using JobPortalApi.DTOs.shared;
 using JobPortalApi.Services.Interface.Admin;
+using JobPortalApi.DTOs.Shared;
 namespace JobPortalApi.Services.Admin
 {
     public class UserService : IUserService
@@ -29,6 +30,39 @@ namespace JobPortalApi.Services.Admin
                     Role = u.Role
                 })
                 .ToListAsync();
+        }
+
+        public async Task<PagedResultDto<UserDto>> GetAllUsersAsync(PagedQuery request)
+        {
+            var page = Math.Max(1, request.Page);
+            var pageSize = Math.Clamp(request.PageSize, 1, 100);
+            var query = _context.Users.AsNoTracking();
+            if (!string.IsNullOrWhiteSpace(request.Search))
+            {
+                var search = request.Search.Trim();
+                query = query.Where(user => user.Email.Contains(search) || user.FullName.Contains(search));
+            }
+            var ordered = string.Equals(request.SortDir, "asc", StringComparison.OrdinalIgnoreCase)
+                ? request.SortBy?.ToLowerInvariant() switch
+                {
+                    "email" => query.OrderBy(user => user.Email),
+                    "name" => query.OrderBy(user => user.FullName),
+                    "createdat" => query.OrderBy(user => user.CreatedAt),
+                    _ => query.OrderBy(user => user.Id)
+                }
+                : request.SortBy?.ToLowerInvariant() switch
+                {
+                    "email" => query.OrderByDescending(user => user.Email),
+                    "name" => query.OrderByDescending(user => user.FullName),
+                    "createdat" => query.OrderByDescending(user => user.CreatedAt),
+                    _ => query.OrderByDescending(user => user.Id)
+                };
+            var total = await query.CountAsync();
+            var items = await ordered.ThenBy(user => user.Id)
+                .Skip((page - 1) * pageSize).Take(pageSize)
+                .Select(u => new UserDto { Id = u.Id, Email = u.Email, FullName = u.FullName, Role = u.Role })
+                .ToListAsync();
+            return new PagedResultDto<UserDto> { Items = items, TotalCount = total, Page = page, PageSize = pageSize };
         }
 
         public async Task<UserDto?> GetUserByIdAsync(Guid id)

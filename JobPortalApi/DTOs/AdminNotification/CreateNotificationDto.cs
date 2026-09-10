@@ -8,5 +8,6 @@
         {
             get; set;
         }
+        public string? SourceMessageId { get; set; }
     }
 }

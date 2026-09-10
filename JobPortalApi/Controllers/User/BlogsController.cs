@@ -1,6 +1,8 @@
 ﻿using JobPortalApi.DTOs.Blog;
 using JobPortalApi.Services.Interface.User;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Authorization;
+using System.Security.Claims;
 
 namespace JobPortalApi.Controllers.User
 {
@@ -16,6 +18,7 @@ namespace JobPortalApi.Controllers.User
         }
 
         [HttpGet]
+        [AllowAnonymous]
         public async Task<IActionResult> GetBlogs([FromQuery] BlogSearchDto searchDto)
         {
             var result = await _blogService.GetBlogsAsync(searchDto);
@@ -23,6 +26,7 @@ namespace JobPortalApi.Controllers.User
         }
 
         [HttpGet("featured")]
+        [AllowAnonymous]
         public async Task<IActionResult> GetFeaturedBlogs()
         {
             var result = await _blogService.GetFeaturedBlogsAsync();
@@ -30,6 +34,7 @@ namespace JobPortalApi.Controllers.User
         }
 
         [HttpGet("{id}")]
+        [AllowAnonymous]
         public async Task<IActionResult> GetBlogById(int id)
         {
             var result = await _blogService.GetBlogByIdAsync(id);
@@ -38,6 +43,7 @@ namespace JobPortalApi.Controllers.User
         }
 
         [HttpGet("slug/{slug}")]
+        [AllowAnonymous]
         public async Task<IActionResult> GetBlogBySlug(string slug)
         {
             var result = await _blogService.GetBlogBySlugAsync(slug);
@@ -46,6 +52,7 @@ namespace JobPortalApi.Controllers.User
         }
 
         [HttpPost]
+        [Authorize(Roles = "Admin")]
         public async Task<IActionResult> CreateBlog([FromBody] CreateBlogDto createDto)
         {
             var result = await _blogService.CreateBlogAsync(createDto);
@@ -53,6 +60,7 @@ namespace JobPortalApi.Controllers.User
         }
 
         [HttpPut("{id}")]
+        [Authorize(Roles = "Admin")]
         public async Task<IActionResult> UpdateBlog(int id, [FromBody] UpdateBlogDto updateDto)
         {
             var result = await _blogService.UpdateBlogAsync(id, updateDto);
@@ -61,6 +69,7 @@ namespace JobPortalApi.Controllers.User
         }
 
         [HttpDelete("{id}")]
+        [Authorize(Roles = "Admin")]
         public async Task<IActionResult> DeleteBlog(int id)
         {
             var success = await _blogService.DeleteBlogAsync(id);
@@ -69,6 +78,7 @@ namespace JobPortalApi.Controllers.User
         }
 
         [HttpGet("categories")]
+        [AllowAnonymous]
         public async Task<IActionResult> GetCategories()
         {
             var result = await _blogService.GetCategoriesAsync();
@@ -76,6 +86,7 @@ namespace JobPortalApi.Controllers.User
         }
 
         [HttpGet("tags")]
+        [AllowAnonymous]
         public async Task<IActionResult> GetPopularTags()
         {
             var result = await _blogService.GetPopularTagsAsync();
@@ -83,20 +94,23 @@ namespace JobPortalApi.Controllers.User
         }
 
         [HttpPost("{id}/views")]
-        public async Task<IActionResult> IncrementViews(int id, [FromQuery] string? userId, [FromQuery] string? ipAddress)
+        [Authorize]
+        public async Task<IActionResult> IncrementViews(int id)
         {
-            await _blogService.IncrementViewsAsync(id, userId, ipAddress);
+            await _blogService.IncrementViewsAsync(id, User.FindFirstValue(ClaimTypes.NameIdentifier), HttpContext.Connection.RemoteIpAddress?.ToString());
             return Ok();
         }
 
         [HttpPost("{id}/like")]
-        public async Task<IActionResult> ToggleLike(int id, [FromQuery] string userId)
+        [Authorize]
+        public async Task<IActionResult> ToggleLike(int id)
         {
-            var result = await _blogService.ToggleLikeAsync(id, userId);
+            var result = await _blogService.ToggleLikeAsync(id, User.FindFirstValue(ClaimTypes.NameIdentifier)!);
             return Ok(result);
         }
 
         [HttpGet("stats")]
+        [Authorize(Roles = "Admin")]
         public async Task<IActionResult> GetStats()
         {
             var result = await _blogService.GetStatsAsync();
@@ -104,6 +118,7 @@ namespace JobPortalApi.Controllers.User
         }
 
         [HttpGet("authors/featured")]
+        [AllowAnonymous]
         public async Task<IActionResult> GetFeaturedAuthors()
         {
             var result = await _blogService.GetFeaturedAuthorsAsync();

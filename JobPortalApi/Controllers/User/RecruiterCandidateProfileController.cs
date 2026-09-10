@@ -1,5 +1,6 @@
 ﻿using JobPortalApi.DTOs.CandidateProfile;
 using JobPortalApi.DTOs.CandidateProfileDto;
+using JobPortalApi.DTOs.Shared;
 using JobPortalApi.Services.Interface.User;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -70,9 +71,19 @@ namespace JobPortalApi.Controllers.User
 
         [HttpGet("recruiter/{id}/applications")]
         [Authorize(Roles = "Recruiter")]
-        public async Task<IActionResult> GetCandidateApplications(Guid id)
+        public async Task<IActionResult> GetCandidateApplications(Guid id, [FromQuery] PagedQuery? query = null)
         {
             var recruiterId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+            if (query != null && (Request.Query.ContainsKey("page") || Request.Query.ContainsKey("pageSize")))
+            {
+                var paged = await _candidateService.GetCandidateApplicationsPagedAsync(recruiterId, id, query);
+                foreach (var application in paged.Items)
+                {
+                    if (!string.IsNullOrEmpty(application.CVUrl))
+                        application.CVUrl = $"/api/candidate-profile/recruiter/{id}/cv";
+                }
+                return Ok(paged);
+            }
             var result = await _candidateService.GetCandidateApplicationsAsync(recruiterId, id);
             foreach (var application in result)
             {
@@ -98,15 +109,17 @@ namespace JobPortalApi.Controllers.User
         public async Task<IActionResult> SearchCandidates([FromQuery] CandidateSearchRequest request)
         {
             var recruiterId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
-            var result = await _candidateService.SearchCandidatesAsync(recruiterId, request);
+            var result = await _candidateService.SearchCandidatesPagedAsync(recruiterId, request);
             return Ok(result);
         }
 
         [HttpGet("recruiter/applied")]
         [Authorize(Roles = "Recruiter")]
-        public async Task<IActionResult> GetCandidatesAppliedToMyJobs()
+        public async Task<IActionResult> GetCandidatesAppliedToMyJobs([FromQuery] PagedQuery? query = null)
         {
             var recruiterId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+            if (query != null && (Request.Query.ContainsKey("page") || Request.Query.ContainsKey("pageSize")))
+                return Ok(await _candidateService.GetCandidatesForRecruiterPagedAsync(recruiterId, query));
             var result = await _candidateService.GetCandidatesForRecruiterAsync(recruiterId);
             return Ok(result);
         }

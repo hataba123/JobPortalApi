@@ -1,9 +1,11 @@
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
 
 namespace JobPortalApi.Controllers;
 
 [ApiController]
+[AllowAnonymous]
 [Route("")]
 public class HealthController : ControllerBase
 {

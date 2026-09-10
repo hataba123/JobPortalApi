@@ -2,6 +2,8 @@
 using JobPortalApi.Services.Interface.User;
 using Microsoft.EntityFrameworkCore;
 using JobPortalApi.Models.Enums;
+using JobPortalApi.Services.Infrastructure;
+using JobPortalApi.Middleware;
 
 namespace JobPortalApi.Services.User
 {
@@ -40,11 +42,12 @@ namespace JobPortalApi.Services.User
                 Founded = company.Founded,
                 Tags = company.Tags,
                 VerificationStatus = company.VerificationStatus,
-                VerifiedAt = company.VerifiedAt
+                VerifiedAt = company.VerifiedAt,
+                Version = ConcurrencyToken.Encode(company.RowVersion)
             };
         }
 
-        public async Task<bool> UpdateMyCompanyAsync(Guid employerId, UpdateCompanyDto dto)
+        public async Task<bool> UpdateMyCompanyAsync(Guid employerId, UpdateCompanyDto dto, byte[]? expectedVersion = null)
         {
             var company = await _context.JobPosts
                 .Where(j => j.EmployerId == employerId && j.CompanyId != null)
@@ -53,6 +56,8 @@ namespace JobPortalApi.Services.User
                 .FirstOrDefaultAsync();
 
             if (company == null) return false;
+            if (expectedVersion is { Length: > 0 })
+                _context.Entry(company).Property(item => item.RowVersion).OriginalValue = expectedVersion;
 
             if (!string.IsNullOrWhiteSpace(dto.Name)) company.Name = dto.Name;
             if (!string.IsNullOrWhiteSpace(dto.Logo)) company.Logo = dto.Logo;
@@ -66,10 +71,14 @@ namespace JobPortalApi.Services.User
             if (!string.IsNullOrWhiteSpace(dto.Founded)) company.Founded = dto.Founded;
             if (!string.IsNullOrWhiteSpace(dto.Tags)) company.Tags = dto.Tags;
 
-            await _context.SaveChangesAsync();
+            try { await _context.SaveChangesAsync(); }
+            catch (DbUpdateConcurrencyException)
+            {
+                throw new ApiConflictException("Công ty đã được cập nhật bởi người khác. Vui lòng tải lại.", "CONCURRENCY_CONFLICT");
+            }
             return true;
         }
-        public async Task<bool> DeleteMyCompanyAsync(Guid employerId)
+        public async Task<bool> DeleteMyCompanyAsync(Guid employerId, byte[]? expectedVersion = null)
         {
             var company = await _context.JobPosts
                 .Where(j => j.EmployerId == employerId && j.CompanyId != null)
@@ -78,12 +87,18 @@ namespace JobPortalApi.Services.User
                 .FirstOrDefaultAsync();
 
             if (company == null) return false;
+            if (expectedVersion is { Length: > 0 })
+                _context.Entry(company).Property(item => item.RowVersion).OriginalValue = expectedVersion;
 
             var hasJobs = await _context.JobPosts.AnyAsync(j => j.CompanyId == company.Id);
             if (hasJobs) return false;
 
             company.DeletedAt = DateTime.UtcNow;
-            await _context.SaveChangesAsync();
+            try { await _context.SaveChangesAsync(); }
+            catch (DbUpdateConcurrencyException)
+            {
+                throw new ApiConflictException("Công ty đã được cập nhật bởi người khác. Vui lòng tải lại.", "CONCURRENCY_CONFLICT");
+            }
             return true;
         }
 

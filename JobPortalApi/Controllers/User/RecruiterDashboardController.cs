@@ -1,5 +1,7 @@
 ﻿using JobPortalApi.Services.Interface.User;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Authorization;
+using System.Security.Claims;
 
 namespace JobPortalApi.Controllers.User
 {
@@ -15,9 +17,12 @@ namespace JobPortalApi.Controllers.User
         }
 
         [HttpGet("{recruiterId}")]
+        [Authorize(Roles = "Recruiter")]
         public async Task<IActionResult> GetDashboard(Guid recruiterId)
         {
-            var dashboard = await _dashboardService.GetDashboardAsync(recruiterId);
+            // Không tin recruiterId do client truyền lên; chỉ dùng subject của JWT.
+            var actorId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
+            var dashboard = await _dashboardService.GetDashboardAsync(actorId);
             return Ok(dashboard);
         }
     }

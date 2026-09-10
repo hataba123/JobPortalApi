@@ -10,5 +10,6 @@
         public string CVUrl { get; set; }
         public string Status { get; set; }
         public DateTime AppliedAt { get; set; }
+        public string Version { get; set; } = string.Empty;
     }
 }

@@ -5,8 +5,13 @@ namespace JobPortalApi.Middleware;
 /// </summary>
 public sealed class ApiConflictException : Exception
 {
-    public ApiConflictException(string message)
+    public string Code { get; }
+    public object? Details { get; }
+
+    public ApiConflictException(string message, string code = "CONFLICT", object? details = null)
         : base(message)
     {
+        Code = code;
+        Details = details;
     }
 }

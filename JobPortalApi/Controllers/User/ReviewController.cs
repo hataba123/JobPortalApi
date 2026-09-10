@@ -17,6 +17,7 @@ namespace JobPortalApi.Controllers.User
             _reviewService = reviewService;
         }
         [HttpGet]
+        [AllowAnonymous]
         public async Task<IActionResult> GetAll()
         {
             var companies = await _reviewService.GetAllAsync();
@@ -24,6 +25,7 @@ namespace JobPortalApi.Controllers.User
         }
 
         [HttpGet("company/{companyId}")]
+        [AllowAnonymous]
         public async Task<IActionResult> GetByCompany(Guid companyId)
         {
             var reviews = await _reviewService.GetByCompanyAsync(companyId);

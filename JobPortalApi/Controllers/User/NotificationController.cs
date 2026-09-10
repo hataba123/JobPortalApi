@@ -4,6 +4,7 @@ using JobPortalApi.Services.Interface.User;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using System.Security.Claims;
+using JobPortalApi.DTOs.Shared;
 
 namespace JobPortalApi.Controllers.User
 {
@@ -22,10 +23,10 @@ namespace JobPortalApi.Controllers.User
         // 🔹 GET: api/notifications
         // 👉 Lấy danh sách thông báo của user hiện tại
         [HttpGet]
-        public async Task<IActionResult> GetMyNotifications()
+        public async Task<IActionResult> GetMyNotifications([FromQuery] PagedQuery query)
         {
             var userId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
-            var result = await _notificationService.GetByUserIdAsync(userId);
+            var result = await _notificationService.GetByUserIdAsync(userId, query);
             return Ok(result);
         }
 

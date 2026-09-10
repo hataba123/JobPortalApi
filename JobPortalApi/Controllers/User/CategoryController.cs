@@ -1,5 +1,6 @@
 using JobPortalApi.Services.Interface.User;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Authorization;
 
 namespace JobPortalApi.Controllers.User
 {
@@ -15,6 +16,7 @@ namespace JobPortalApi.Controllers.User
         }
 
         [HttpGet]
+        [AllowAnonymous]
         public async Task<IActionResult> GetAll()
         {
             var categories = await _categoryService.GetAllAsync();
@@ -22,6 +24,7 @@ namespace JobPortalApi.Controllers.User
         }
 
         [HttpGet("{id}")]
+        [AllowAnonymous]
         public async Task<IActionResult> GetById(Guid id)
         {
             var category = await _categoryService.GetByIdAsync(id);
@@ -29,6 +32,7 @@ namespace JobPortalApi.Controllers.User
         }
 
         [HttpPost]
+        [Authorize(Roles = "Admin")]
         public async Task<IActionResult> Create([FromBody] JobPortalApi.DTOs.Category.CreateCategoryDto dto)
         {
             var result = await _categoryService.CreateAsync(dto);
@@ -36,6 +40,7 @@ namespace JobPortalApi.Controllers.User
         }
 
         [HttpPut("{id}")]
+        [Authorize(Roles = "Admin")]
         public async Task<IActionResult> Update(Guid id, [FromBody] JobPortalApi.DTOs.Category.UpdateCategoryDto dto)
         {
             var result = await _categoryService.UpdateAsync(id, dto);
@@ -43,6 +48,7 @@ namespace JobPortalApi.Controllers.User
         }
 
         [HttpDelete("{id}")]
+        [Authorize(Roles = "Admin")]
         public async Task<IActionResult> Delete(Guid id)
         {
             var success = await _categoryService.DeleteAsync(id);

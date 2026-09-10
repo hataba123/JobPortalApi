@@ -34,6 +34,13 @@ public class ApplicationDbContext : DbContext
     public DbSet<CreditLedger> CreditLedgers { get; set; }
 
     public DbSet<Review> Review { get; set; } // Thêm DbSet<Review> nếu có
+    public DbSet<ApplicationStatusHistory> ApplicationStatusHistories { get; set; }
+    public DbSet<Interview> Interviews { get; set; }
+    public DbSet<AuditLog> AuditLogs { get; set; }
+    public DbSet<OutboxMessage> OutboxMessages { get; set; }
+    public DbSet<NewsletterSubscription> NewsletterSubscriptions { get; set; }
+    public DbSet<CandidateSkill> CandidateSkills { get; set; }
+    public DbSet<JobReport> JobReports { get; set; }
 
     // Thêm các DbSet khác nếu có
 
@@ -86,6 +93,7 @@ public class ApplicationDbContext : DbContext
 
         modelBuilder.Entity<Job>()
                .ToTable("Jobs"); // Map Job thành bảng Applies
+        modelBuilder.Entity<Job>().Property(a => a.RowVersion).IsRowVersion();
         modelBuilder.Entity<Job>()
 
              .HasOne(a => a.JobPost)
@@ -101,6 +109,82 @@ public class ApplicationDbContext : DbContext
         modelBuilder.Entity<Job>()
             .HasIndex(a => new { a.CandidateId, a.JobPostId })
             .IsUnique();
+
+        modelBuilder.Entity<ApplicationStatusHistory>()
+            .HasOne(history => history.Application)
+            .WithMany()
+            .HasForeignKey(history => history.ApplicationId)
+            .OnDelete(DeleteBehavior.Cascade);
+        modelBuilder.Entity<ApplicationStatusHistory>()
+            .HasIndex(history => new { history.ApplicationId, history.ChangedAt });
+
+        modelBuilder.Entity<Interview>()
+            .Property(interview => interview.RowVersion)
+            .IsRowVersion();
+        modelBuilder.Entity<Interview>()
+            .HasOne(interview => interview.Application)
+            .WithMany()
+            .HasForeignKey(interview => interview.ApplicationId)
+            .OnDelete(DeleteBehavior.Cascade);
+        modelBuilder.Entity<Interview>()
+            .HasOne(interview => interview.Interviewer)
+            .WithMany()
+            .HasForeignKey(interview => interview.InterviewerId)
+            .OnDelete(DeleteBehavior.Restrict);
+        modelBuilder.Entity<Interview>()
+            .HasIndex(interview => new { interview.InterviewerId, interview.StartAt, interview.Status });
+        modelBuilder.Entity<Interview>()
+            .HasIndex(interview => new { interview.ApplicationId, interview.StartAt });
+
+        modelBuilder.Entity<JobPost>().Property(post => post.RowVersion).IsRowVersion();
+        modelBuilder.Entity<Company>().Property(company => company.RowVersion).IsRowVersion();
+
+        modelBuilder.Entity<AuditLog>()
+            .HasIndex(log => new { log.EntityType, log.EntityId, log.CreatedAt });
+        modelBuilder.Entity<AuditLog>()
+            .HasIndex(log => new { log.ActorId, log.CreatedAt });
+
+        modelBuilder.Entity<OutboxMessage>()
+            .HasIndex(message => new { message.ProcessedAt, message.NextAttemptAt, message.OccurredAt });
+        modelBuilder.Entity<OutboxMessage>()
+            .HasIndex(message => message.DeduplicationKey)
+            .IsUnique()
+            .HasFilter("[DeduplicationKey] IS NOT NULL");
+
+        modelBuilder.Entity<NewsletterSubscription>()
+            .HasIndex(subscription => new { subscription.Email, subscription.IsActive })
+            .IsUnique();
+
+        modelBuilder.Entity<Notification>()
+            .HasIndex(notification => new { notification.SourceMessageId, notification.UserId })
+            .IsUnique()
+            .HasFilter("[SourceMessageId] IS NOT NULL");
+
+        modelBuilder.Entity<NewsletterSubscription>()
+            .HasIndex(subscription => subscription.UserId)
+            .IsUnique();
+
+        modelBuilder.Entity<CandidateSkill>()
+            .HasIndex(skill => new { skill.NormalizedName, skill.CandidateProfileId })
+            .IsUnique();
+        modelBuilder.Entity<CandidateSkill>()
+            .HasOne(skill => skill.CandidateProfile)
+            .WithMany()
+            .HasForeignKey(skill => skill.CandidateProfileId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity<JobReport>()
+            .HasOne(report => report.JobPost)
+            .WithMany()
+            .HasForeignKey(report => report.JobPostId)
+            .OnDelete(DeleteBehavior.Restrict);
+        modelBuilder.Entity<JobReport>()
+            .HasOne(report => report.Reporter)
+            .WithMany()
+            .HasForeignKey(report => report.ReporterId)
+            .OnDelete(DeleteBehavior.Restrict);
+        modelBuilder.Entity<JobReport>()
+            .HasIndex(report => new { report.Status, report.CreatedAt });
         modelBuilder.Entity<SavedJob>()
     .ToTable("SavedJobs");
 

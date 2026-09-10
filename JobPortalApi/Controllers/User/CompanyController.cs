@@ -1,6 +1,7 @@
 ﻿using JobPortalApi.DTOs.Company;
 using JobPortalApi.Services.Interface.User;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Authorization;
 
 namespace JobPortalApi.Controllers.User
 {
@@ -16,6 +17,7 @@ namespace JobPortalApi.Controllers.User
         }
 
         [HttpGet]
+        [AllowAnonymous]
         public async Task<IActionResult> GetAll()
         {
             var companies = await _companyService.GetAllAsync();
@@ -23,6 +25,7 @@ namespace JobPortalApi.Controllers.User
         }
 
         [HttpGet("{id}")]
+        [AllowAnonymous]
         public async Task<IActionResult> GetById(Guid id)
         {
             var company = await _companyService.GetByIdAsync(id);

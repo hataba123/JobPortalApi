@@ -26,5 +26,8 @@ public class Job
 
     [MaxLength(300)]
     public string CVUrl { get; set; }
-    public ApplyStatus Status { get; set; } = ApplyStatus.Pending;
+    public ApplyStatus Status { get; set; } = ApplyStatus.Applied;
+
+    [Timestamp]
+    public byte[] RowVersion { get; set; } = Array.Empty<byte>();
 }

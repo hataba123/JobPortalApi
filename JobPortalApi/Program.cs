@@ -4,6 +4,7 @@ using JobPortalApi.Services.Interface.Admin;
 using JobPortalApi.Services.Interface.User;
 using JobPortalApi.Services.User;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -62,9 +63,16 @@ builder.Services.AddScoped<JobPortalApi.Services.Interface.User.ICompanyService,
 builder.Services.AddScoped<IJobService, JobService>();
 
 builder.Services.AddScoped<IApplyService, ApplyService>();
+builder.Services.AddScoped<IInterviewService, InterviewService>();
+builder.Services.AddScoped<IJobReportService, JobReportService>();
+builder.Services.AddHttpContextAccessor();
+builder.Services.AddScoped<IRequestContext, HttpRequestContext>();
+builder.Services.AddScoped<IAuditLogService, AuditLogService>();
+builder.Services.AddScoped<IOutboxService, OutboxService>();
 builder.Services.AddScoped<MatchingService>();
 builder.Services.AddScoped<PaymentService>();
 builder.Services.AddScoped<PublicMediaService>();
+builder.Services.AddHostedService<BackgroundProcessingService>();
 // add db context
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection"),
@@ -135,7 +143,15 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
                 }
             };
         });
-    builder.Services.AddAuthorization();
+    builder.Services.AddAuthorization(options =>
+    {
+        // Deny by default; every public endpoint opts in explicitly with
+        // [AllowAnonymous]. This prevents a newly-added mutation from being
+        // accidentally exposed without authentication.
+        options.FallbackPolicy = new AuthorizationPolicyBuilder()
+            .RequireAuthenticatedUser()
+            .Build();
+    });
     builder.Services.AddRateLimiter(options =>
     {
         options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;

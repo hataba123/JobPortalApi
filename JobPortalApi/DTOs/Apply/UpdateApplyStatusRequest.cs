@@ -2,6 +2,10 @@
 {
     public class UpdateApplyStatusRequest
     {
-        public string Status { get; set; } = string.Empty;
+        public string? Status { get; set; }
+        public string? ToStatus { get; set; }
+        public string? Reason { get; set; }
+
+        public string RequestedStatus => ToStatus ?? Status ?? string.Empty;
     }
 }

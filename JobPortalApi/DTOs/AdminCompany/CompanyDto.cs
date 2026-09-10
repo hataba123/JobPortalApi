@@ -16,5 +16,6 @@
         public string Tags { get; set; }
         public JobPortalApi.Models.Enums.CompanyVerificationStatus VerificationStatus { get; set; }
         public DateTime? VerifiedAt { get; set; }
+        public string Version { get; set; } = string.Empty;
     }
 }

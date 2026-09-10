@@ -25,6 +25,9 @@ namespace JobPortalApi.Models
 
             [MaxLength(50)]
             public string Type { get; set; }
+
+            [MaxLength(64)]
+            public string? SourceMessageId { get; set; }
         }
     }
 

@@ -2,6 +2,7 @@
 using JobPortalApi.Services.Interface.Admin;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using JobPortalApi.DTOs.Shared;
 
 namespace JobPortalApi.Controllers.Admin
 {
@@ -19,9 +20,9 @@ namespace JobPortalApi.Controllers.Admin
 
         // 🔹 Get all notifications
         [HttpGet]
-        public async Task<IActionResult> GetAll()
+        public async Task<IActionResult> GetAll([FromQuery] PagedQuery query)
         {
-            var result = await _notificationService.GetAllAsync();
+            var result = await _notificationService.GetAllAsync(query);
             return Ok(result);
         }
 

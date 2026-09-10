@@ -2,6 +2,7 @@
 using JobPortalApi.Services.Interface.Admin;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using JobPortalApi.DTOs.Shared;
 
 namespace JobPortalApi.Controllers.Admin
 {
@@ -18,8 +19,8 @@ namespace JobPortalApi.Controllers.Admin
         }
 
         [HttpGet]
-        public async Task<IActionResult> GetAll()
-            => Ok(await _reviewService.GetAllReviewsAsync());
+        public async Task<IActionResult> GetAll([FromQuery] PagedQuery query)
+            => Ok(await _reviewService.GetAllReviewsAsync(query));
 
         [HttpGet("{id}")]
         public async Task<IActionResult> GetById(Guid id)

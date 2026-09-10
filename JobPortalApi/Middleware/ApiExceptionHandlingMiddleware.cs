@@ -32,7 +32,8 @@ namespace JobPortalApi.Middleware
         {
             var statusCode = exception switch
             {
-                UnauthorizedAccessException => StatusCodes.Status401Unauthorized,
+                UnauthorizedAccessException => StatusCodes.Status403Forbidden,
+                KeyNotFoundException => StatusCodes.Status404NotFound,
                 ArgumentException => StatusCodes.Status400BadRequest,
                 InvalidOperationException => StatusCodes.Status400BadRequest,
                 ApiConflictException => StatusCodes.Status409Conflict,
@@ -50,9 +51,10 @@ namespace JobPortalApi.Middleware
             var response = new
             {
                 statusCode,
-                code = ToCode(statusCode),
+                code = exception is ApiConflictException conflict ? conflict.Code : ToCode(statusCode),
                 message = statusCode >= 500 ? "Đã xảy ra lỗi máy chủ." : exception.Message,
-                traceId = context.TraceIdentifier
+                traceId = context.TraceIdentifier,
+                details = exception is ApiConflictException conflictDetails ? conflictDetails.Details : null
             };
             await context.Response.WriteAsJsonAsync(response);
         }
@@ -65,6 +67,7 @@ namespace JobPortalApi.Middleware
             StatusCodes.Status404NotFound => "NOT_FOUND",
             StatusCodes.Status409Conflict => "CONFLICT",
             StatusCodes.Status429TooManyRequests => "RATE_LIMITED",
+            StatusCodes.Status428PreconditionRequired => "PRECONDITION_REQUIRED",
             _ => "INTERNAL_SERVER_ERROR"
         };
     }

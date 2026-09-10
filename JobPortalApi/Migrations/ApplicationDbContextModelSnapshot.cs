@@ -41,6 +41,12 @@ namespace JobPortalApi.Migrations
                     b.Property<Guid>("JobPostId")
                         .HasColumnType("uniqueidentifier");
 
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
                     b.Property<int>("Status")
                         .HasColumnType("int");
 
@@ -52,6 +58,88 @@ namespace JobPortalApi.Migrations
                         .IsUnique();
 
                     b.ToTable("Jobs", (string)null);
+                });
+
+            modelBuilder.Entity("JobPortalApi.Models.ApplicationStatusHistory", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("ApplicationId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime>("ChangedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid?>("ChangedBy")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<int?>("FromStatus")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Reason")
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
+
+                    b.Property<int>("ToStatus")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ApplicationId", "ChangedAt");
+
+                    b.ToTable("ApplicationStatusHistories");
+                });
+
+            modelBuilder.Entity("JobPortalApi.Models.AuditLog", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Action")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<Guid?>("ActorId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("After")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Before")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("CorrelationId")
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("EntityId")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("EntityType")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("IpAddress")
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ActorId", "CreatedAt");
+
+                    b.HasIndex("EntityType", "EntityId", "CreatedAt");
+
+                    b.ToTable("AuditLogs");
                 });
 
             modelBuilder.Entity("JobPortalApi.Models.Blog", b =>
@@ -308,6 +396,35 @@ namespace JobPortalApi.Migrations
                     b.ToTable("CandidateProfiles");
                 });
 
+            modelBuilder.Entity("JobPortalApi.Models.CandidateSkill", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("CandidateProfileId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("DisplayName")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.Property<string>("NormalizedName")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CandidateProfileId");
+
+                    b.HasIndex("NormalizedName", "CandidateProfileId")
+                        .IsUnique();
+
+                    b.ToTable("CandidateSkills");
+                });
+
             modelBuilder.Entity("JobPortalApi.Models.Category", b =>
                 {
                     b.Property<Guid>("Id")
@@ -384,6 +501,12 @@ namespace JobPortalApi.Migrations
                     b.Property<double>("Rating")
                         .HasColumnType("float");
 
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
                     b.Property<string>("Tags")
                         .IsRequired()
                         .HasMaxLength(500)
@@ -449,6 +572,66 @@ namespace JobPortalApi.Migrations
                     b.ToTable("CreditLedgers");
                 });
 
+            modelBuilder.Entity("JobPortalApi.Models.Interview", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("ApplicationId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime>("EndAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid>("InterviewerId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Location")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<string>("MeetingUrl")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<string>("Notes")
+                        .HasMaxLength(4000)
+                        .HasColumnType("nvarchar(4000)");
+
+                    b.Property<int>("Result")
+                        .HasColumnType("int");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
+                    b.Property<DateTime>("StartAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("int");
+
+                    b.Property<int>("Type")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ApplicationId", "StartAt");
+
+                    b.HasIndex("InterviewerId", "StartAt", "Status");
+
+                    b.ToTable("Interviews");
+                });
+
             modelBuilder.Entity("JobPortalApi.Models.JobPost", b =>
                 {
                     b.Property<Guid>("Id")
@@ -497,6 +680,12 @@ namespace JobPortalApi.Migrations
                     b.Property<int?>("MinExperienceYears")
                         .HasColumnType("int");
 
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
                     b.Property<decimal>("Salary")
                         .HasColumnType("decimal(18,2)");
 
@@ -538,6 +727,58 @@ namespace JobPortalApi.Migrations
                     b.HasIndex("Status", "ExpiresAt");
 
                     b.ToTable("JobPosts", (string)null);
+                });
+
+            modelBuilder.Entity("JobPortalApi.Models.JobReport", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
+                    b.Property<Guid>("JobPostId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Reason")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<Guid>("ReporterId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<DateTime?>("ResolvedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid?>("ResolvedBy")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .IsRequired()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("rowversion");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("JobPostId");
+
+                    b.HasIndex("ReporterId");
+
+                    b.HasIndex("Status", "CreatedAt");
+
+                    b.ToTable("JobReports");
                 });
 
             modelBuilder.Entity("JobPortalApi.Models.MatchResult", b =>
@@ -596,6 +837,40 @@ namespace JobPortalApi.Migrations
                     b.ToTable("MatchResults");
                 });
 
+            modelBuilder.Entity("JobPortalApi.Models.NewsletterSubscription", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Email")
+                        .IsRequired()
+                        .HasMaxLength(320)
+                        .HasColumnType("nvarchar(320)");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("bit");
+
+                    b.Property<DateTime>("SubscribedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime?>("UnsubscribedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Email", "IsActive")
+                        .IsUnique();
+
+                    b.HasIndex("UserId")
+                        .IsUnique();
+
+                    b.ToTable("NewsletterSubscriptions");
+                });
+
             modelBuilder.Entity("JobPortalApi.Models.Notification", b =>
                 {
                     b.Property<Guid>("Id")
@@ -612,6 +887,10 @@ namespace JobPortalApi.Migrations
                     b.Property<bool>("Read")
                         .HasColumnType("bit");
 
+                    b.Property<string>("SourceMessageId")
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
                     b.Property<string>("Type")
                         .IsRequired()
                         .HasMaxLength(50)
@@ -623,6 +902,10 @@ namespace JobPortalApi.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("UserId");
+
+                    b.HasIndex("SourceMessageId", "UserId")
+                        .IsUnique()
+                        .HasFilter("[SourceMessageId] IS NOT NULL");
 
                     b.ToTable("Notifications");
                 });
@@ -657,6 +940,59 @@ namespace JobPortalApi.Migrations
                         .IsUnique();
 
                     b.ToTable("OAuthAccounts");
+                });
+
+            modelBuilder.Entity("JobPortalApi.Models.OutboxMessage", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<int>("Attempts")
+                        .HasColumnType("int");
+
+                    b.Property<string>("CorrelationId")
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
+
+                    b.Property<DateTime?>("DeadLetteredAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("DeduplicationKey")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<string>("LastError")
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
+                    b.Property<DateTime?>("NextAttemptAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime>("OccurredAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Payload")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime?>("ProcessedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Type")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("DeduplicationKey")
+                        .IsUnique()
+                        .HasFilter("[DeduplicationKey] IS NOT NULL");
+
+                    b.HasIndex("ProcessedAt", "NextAttemptAt", "OccurredAt");
+
+                    b.ToTable("OutboxMessages");
                 });
 
             modelBuilder.Entity("JobPortalApi.Models.PasswordResetToken", b =>
@@ -916,6 +1252,17 @@ namespace JobPortalApi.Migrations
                     b.Navigation("JobPost");
                 });
 
+            modelBuilder.Entity("JobPortalApi.Models.ApplicationStatusHistory", b =>
+                {
+                    b.HasOne("Job", "Application")
+                        .WithMany()
+                        .HasForeignKey("ApplicationId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Application");
+                });
+
             modelBuilder.Entity("JobPortalApi.Models.Blog", b =>
                 {
                     b.HasOne("JobPortalApi.Models.BlogAuthor", "Author")
@@ -960,6 +1307,17 @@ namespace JobPortalApi.Migrations
                     b.Navigation("User");
                 });
 
+            modelBuilder.Entity("JobPortalApi.Models.CandidateSkill", b =>
+                {
+                    b.HasOne("JobPortalApi.Models.CandidateProfile", "CandidateProfile")
+                        .WithMany()
+                        .HasForeignKey("CandidateProfileId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("CandidateProfile");
+                });
+
             modelBuilder.Entity("JobPortalApi.Models.CreditLedger", b =>
                 {
                     b.HasOne("JobPortalApi.Models.PaymentOrder", "PaymentOrder")
@@ -976,6 +1334,25 @@ namespace JobPortalApi.Migrations
                     b.Navigation("PaymentOrder");
 
                     b.Navigation("User");
+                });
+
+            modelBuilder.Entity("JobPortalApi.Models.Interview", b =>
+                {
+                    b.HasOne("Job", "Application")
+                        .WithMany()
+                        .HasForeignKey("ApplicationId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("JobPortalApi.Models.User", "Interviewer")
+                        .WithMany()
+                        .HasForeignKey("InterviewerId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Application");
+
+                    b.Navigation("Interviewer");
                 });
 
             modelBuilder.Entity("JobPortalApi.Models.JobPost", b =>
@@ -1001,6 +1378,25 @@ namespace JobPortalApi.Migrations
                     b.Navigation("Company");
 
                     b.Navigation("Employer");
+                });
+
+            modelBuilder.Entity("JobPortalApi.Models.JobReport", b =>
+                {
+                    b.HasOne("JobPortalApi.Models.JobPost", "JobPost")
+                        .WithMany()
+                        .HasForeignKey("JobPostId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("JobPortalApi.Models.User", "Reporter")
+                        .WithMany()
+                        .HasForeignKey("ReporterId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("JobPost");
+
+                    b.Navigation("Reporter");
                 });
 
             modelBuilder.Entity("JobPortalApi.Models.MatchResult", b =>

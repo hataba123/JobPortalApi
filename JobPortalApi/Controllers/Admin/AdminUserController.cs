@@ -3,6 +3,7 @@ using JobPortalApi.Services.Interface;
 using JobPortalApi.Services.Interface.Admin;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using JobPortalApi.DTOs.Shared;
 
 namespace JobPortalApi.Controllers.Admin
 {
@@ -19,9 +20,9 @@ namespace JobPortalApi.Controllers.Admin
         }
 
         [HttpGet]
-        public async Task<IActionResult> GetAll()
+        public async Task<IActionResult> GetAll([FromQuery] PagedQuery query)
         {
-            var users = await _userService.GetAllUsersAsync();
+            var users = await _userService.GetAllUsersAsync(query);
             return Ok(users);
         }
 

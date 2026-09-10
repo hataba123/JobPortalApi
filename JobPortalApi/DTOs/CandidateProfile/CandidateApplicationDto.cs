@@ -10,5 +10,6 @@ namespace JobPortalApi.DTOs.CandidateProfile
         public DateTime AppliedAt { get; set; }
         public string CVUrl { get; set; }
         public ApplyStatus Status { get; set; }
+        public string Version { get; set; } = string.Empty;
     }
 }

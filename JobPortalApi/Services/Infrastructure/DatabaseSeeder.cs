@@ -178,10 +178,10 @@ namespace JobPortalApi.Services.Infrastructure
             await UpsertJobPostAsync(context, MobileJobPostId, "Mobile Developer (Demo)", "Phát triển trải nghiệm mobile mượt mà cho ứng dụng tìm việc JobPortal.", "Swift, iOS, REST API", "Hồ Chí Minh", 30000000, RecruiterId, AppleCompanyId, "Full-time", new List<string> { "Swift", "iOS", "Mobile" }, MobileCategoryId, 2, "Cao đẳng", "/uploads/logo/company-apple.svg");
             await UpsertJobPostAsync(context, ProductJobPostId, "Product Designer (Demo)", "Thiết kế trải nghiệm người dùng và hệ thống giao diện cho nền tảng tuyển dụng.", "Figma, UX Research, Design System", "Hà Nội", 26000000, RecruiterId, GithubCompanyId, "Hybrid", new List<string> { "Figma", "UX", "Product" }, FrontendCategoryId, 2, "Không bắt buộc", "/uploads/logo/company-github.svg");
 
-            await UpsertJobAsync(context, Guid.Parse("50000000-0000-0000-0000-000000000001"), JobPostId, CandidateId, ApplyStatus.Reviewed);
-            await UpsertJobAsync(context, Guid.Parse("50000000-0000-0000-0000-000000000002"), FrontendJobPostId, CandidateSecondId, ApplyStatus.Accepted);
-            await UpsertJobAsync(context, Guid.Parse("50000000-0000-0000-0000-000000000003"), DataJobPostId, CandidateThirdId, ApplyStatus.Pending);
-            await UpsertJobAsync(context, Guid.Parse("50000000-0000-0000-0000-000000000004"), DevopsJobPostId, CandidateFourthId, ApplyStatus.Reviewed);
+            await UpsertJobAsync(context, Guid.Parse("50000000-0000-0000-0000-000000000001"), JobPostId, CandidateId, ApplyStatus.Screening);
+            await UpsertJobAsync(context, Guid.Parse("50000000-0000-0000-0000-000000000002"), FrontendJobPostId, CandidateSecondId, ApplyStatus.Offer);
+            await UpsertJobAsync(context, Guid.Parse("50000000-0000-0000-0000-000000000003"), DataJobPostId, CandidateThirdId, ApplyStatus.Applied);
+            await UpsertJobAsync(context, Guid.Parse("50000000-0000-0000-0000-000000000004"), DevopsJobPostId, CandidateFourthId, ApplyStatus.Screening);
             await UpsertSavedJobAsync(context, Guid.Parse("60000000-0000-0000-0000-000000000001"), CandidateId, DevopsJobPostId);
             await UpsertSavedJobAsync(context, Guid.Parse("60000000-0000-0000-0000-000000000002"), CandidateSecondId, MobileJobPostId);
 

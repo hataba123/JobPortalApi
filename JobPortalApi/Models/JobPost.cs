@@ -65,5 +65,8 @@ namespace JobPortalApi.Models
         [ForeignKey(nameof(CategoryId))]
         public Category Category { get; set; }
 
+        [Timestamp]
+        public byte[] RowVersion { get; set; } = Array.Empty<byte>();
+
     }
 }

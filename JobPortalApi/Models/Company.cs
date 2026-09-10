@@ -46,6 +46,9 @@ namespace JobPortalApi.Models
         public CompanyVerificationStatus VerificationStatus { get; set; } = CompanyVerificationStatus.Pending;
         public DateTime? VerifiedAt { get; set; }
 
+        [Timestamp]
+        public byte[] RowVersion { get; set; } = Array.Empty<byte>();
+
 
     }
 }

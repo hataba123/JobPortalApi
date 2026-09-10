@@ -20,5 +20,6 @@
         public int? MinExperienceYears { get; set; }
         public string? EducationRequirement { get; set; }
         public Guid CategoryId { get; set; }
+        public string Version { get; set; } = string.Empty;
     }
 }

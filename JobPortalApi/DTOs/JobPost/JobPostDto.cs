@@ -18,5 +18,6 @@
         public string? EducationRequirement { get; set; }
         public string CategoryName { get; set; }
         public string CompanyName { get; set; }
+        public string Version { get; set; } = string.Empty;
     }
 }

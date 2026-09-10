@@ -5,6 +5,7 @@ using JobPortalApi.Services.Interface.User;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using System.Security.Claims;
+using JobPortalApi.Services.Infrastructure;
 
 namespace JobPortalApi.Controllers.User
 {
@@ -20,6 +21,7 @@ namespace JobPortalApi.Controllers.User
         }
 
         [HttpGet]
+        [AllowAnonymous]
         public async Task<IActionResult> GetAll([FromQuery] int page = 1, [FromQuery] int pageSize = 20)
         {
             if (page < 1 || pageSize < 1 || pageSize > 100)
@@ -28,12 +30,14 @@ namespace JobPortalApi.Controllers.User
             return Ok(posts);
         }
         [HttpGet("company/{companyId}")]
+        [AllowAnonymous]
         public async Task<IActionResult> GetByCompanyId(Guid companyId)
         {
             var jobPosts = await _jobService.GetByCompanyIdAsync(companyId);
             return Ok(jobPosts); // Trả về 200 OK với danh sách job post
         }
         [HttpGet("category/{categoryId}")]
+        [AllowAnonymous]
         public async Task<IActionResult> GetByCategoryId(Guid categoryId)
         {
             var result = await _jobService.GetByCategoryIdAsync(categoryId);
@@ -41,10 +45,12 @@ namespace JobPortalApi.Controllers.User
         }
 
         [HttpGet("{id}")]
+        [AllowAnonymous]
         public async Task<IActionResult> GetById(Guid id)
         {
             var post = await _jobService.GetByIdAsync(id);
             if (post == null) return NotFound();
+            Response.Headers.ETag = $"\"{post.Version}\"";
             return Ok(post);
         }
 
@@ -68,20 +74,25 @@ namespace JobPortalApi.Controllers.User
 
         [HttpPut("{id}")]
         [Authorize(Roles = "Recruiter")]
-        public async Task<IActionResult> Update(Guid id, UpdateJobPostDto dto)
+        public async Task<IActionResult> Update(Guid id, UpdateJobPostDto dto, [FromHeader(Name = "If-Match")] string? ifMatch)
         {
+            var version = string.IsNullOrWhiteSpace(ifMatch) ? null : ConcurrencyToken.Decode(ifMatch.Trim());
+            if (version == null) return StatusCode(StatusCodes.Status428PreconditionRequired);
             var recruiterId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
-            var updated = await _jobService.UpdateAsync(id, dto, recruiterId);
+            var updated = await _jobService.UpdateAsync(id, dto, recruiterId, version);
             if (updated == null) return NotFound();
+            Response.Headers.ETag = $"\"{updated.Version}\"";
             return Ok(updated);
         }
 
         [HttpDelete("{id}")]
         [Authorize(Roles = "Recruiter")]
-        public async Task<IActionResult> Delete(Guid id)
+        public async Task<IActionResult> Delete(Guid id, [FromHeader(Name = "If-Match")] string? ifMatch)
         {
+            var version = string.IsNullOrWhiteSpace(ifMatch) ? null : ConcurrencyToken.Decode(ifMatch.Trim());
+            if (version == null) return StatusCode(StatusCodes.Status428PreconditionRequired);
             var recruiterId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
-            var success = await _jobService.DeleteAsync(id, recruiterId);
+            var success = await _jobService.DeleteAsync(id, recruiterId, version);
             if (!success) return NotFound();
             return Ok(new { message = "Đã xóa mềm tin." });
         }
