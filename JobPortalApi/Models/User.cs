@@ -21,6 +21,8 @@ namespace JobPortalApi.Models
         public string FullName { get; set; }
         public DateTime CreatedAt { get; set; } // ✅ Dòng này phải tồn tại
         public int PasswordVersion { get; set; }
+        public int FailedLoginAttempts { get; set; }
+        public DateTime? LockoutUntil { get; set; }
         public DateTime? DeletedAt { get; set; }
 
 

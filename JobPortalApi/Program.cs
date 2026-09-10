@@ -71,6 +71,7 @@ builder.Services.AddScoped<IAuditLogService, AuditLogService>();
 builder.Services.AddScoped<IOutboxService, OutboxService>();
 builder.Services.AddScoped<MatchingService>();
 builder.Services.AddScoped<PaymentService>();
+builder.Services.AddScoped<CreditLedgerService>();
 builder.Services.AddScoped<PublicMediaService>();
 builder.Services.AddHostedService<BackgroundProcessingService>();
 // add db context
@@ -301,5 +302,8 @@ if (app.Environment.IsDevelopment())
     static string GetClientAddress(HttpContext context) =>
         context.Connection.RemoteIpAddress?.ToString() ?? "unknown";
 
+public partial class Program
+{
+}
 
 

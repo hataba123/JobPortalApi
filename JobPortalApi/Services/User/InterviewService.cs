@@ -6,6 +6,7 @@ using JobPortalApi.Models.Enums;
 using JobPortalApi.Services.Infrastructure;
 using JobPortalApi.Services.Interface.User;
 using Microsoft.EntityFrameworkCore;
+using System.Data;
 
 namespace JobPortalApi.Services.User;
 
@@ -24,6 +25,11 @@ public sealed class InterviewService : IInterviewService
 
     public async Task<InterviewDto> CreateAsync(Guid applicationId, Guid actorId, bool isAdmin, CreateInterviewRequest request, byte[]? applicationVersion)
     {
+        // Giữ conflict check và insert trong cùng critical section của SQL Server.
+        var executionStrategy = _context.Database.CreateExecutionStrategy();
+        return await executionStrategy.ExecuteAsync(async () =>
+        {
+        await using var transaction = await _context.Database.BeginTransactionAsync(IsolationLevel.Serializable);
         var application = await _context.Jobs
             .Include(item => item.JobPost)
             .Include(item => item.Candidate)
@@ -88,12 +94,14 @@ public sealed class InterviewService : IInterviewService
         try
         {
             await _context.SaveChangesAsync();
+            await transaction.CommitAsync();
         }
         catch (DbUpdateConcurrencyException)
         {
             throw new ApiConflictException("Hồ sơ đã được người khác cập nhật. Vui lòng tải lại dữ liệu.");
         }
         return ToDto(interview);
+        });
     }
 
     public async Task<InterviewDto?> GetByIdAsync(Guid id, Guid actorId, bool isAdmin, bool isCandidate)
@@ -158,6 +166,10 @@ public sealed class InterviewService : IInterviewService
 
     public async Task<InterviewDto?> UpdateAsync(Guid id, Guid actorId, bool isAdmin, UpdateInterviewRequest request, byte[]? expectedVersion)
     {
+        var executionStrategy = _context.Database.CreateExecutionStrategy();
+        return await executionStrategy.ExecuteAsync(async () =>
+        {
+        await using var transaction = await _context.Database.BeginTransactionAsync(IsolationLevel.Serializable);
         var interview = await Query().FirstOrDefaultAsync(item => item.Id == id);
         if (interview == null) return null;
         if (!CanManage(interview, actorId, isAdmin)) return null;
@@ -183,14 +195,31 @@ public sealed class InterviewService : IInterviewService
         interview.UpdatedAt = DateTime.UtcNow;
         _auditLog.Add("Interview.Updated", "Interview", interview.Id.ToString("D"), before,
             new { interview.Type, interview.StartAt, interview.EndAt, interview.Location, interview.MeetingUrl, interview.Notes });
-        _outbox.Add("interview.rescheduled", new { InterviewId = interview.Id, interview.StartAt, interview.EndAt },
+        _outbox.Add("interview.rescheduled", new
+        {
+            InterviewId = interview.Id,
+            ApplicationId = interview.ApplicationId,
+            CandidateId = interview.Application.CandidateId,
+            CandidateEmail = interview.Application.Candidate.Email,
+            JobTitle = interview.Application.JobPost.Title,
+            interview.StartAt,
+            interview.EndAt,
+            interview.MeetingUrl,
+            interview.Location
+        },
             $"interview:{interview.Id:D}:updated:{interview.StartAt.Ticks}");
         await SaveWithConcurrencyAsync();
+        await transaction.CommitAsync();
         return ToDto(interview);
+        });
     }
 
     public async Task<InterviewDto?> CompleteAsync(Guid id, Guid actorId, bool isAdmin, CompleteInterviewRequest request, byte[]? expectedInterviewVersion, byte[]? expectedApplicationVersion)
     {
+        var executionStrategy = _context.Database.CreateExecutionStrategy();
+        return await executionStrategy.ExecuteAsync(async () =>
+        {
+        await using var transaction = await _context.Database.BeginTransactionAsync();
         var interview = await Query().FirstOrDefaultAsync(item => item.Id == id);
         if (interview == null) return null;
         if (!CanManage(interview, actorId, isAdmin)) return null;
@@ -233,11 +262,17 @@ public sealed class InterviewService : IInterviewService
             ToStatus = targetStatus
         }, $"application:{interview.ApplicationId:D}:status:{targetStatus}");
         await SaveWithConcurrencyAsync();
+        await transaction.CommitAsync();
         return ToDto(interview);
+        });
     }
 
     public async Task<InterviewDto?> CancelAsync(Guid id, Guid actorId, bool isAdmin, byte[]? expectedVersion)
     {
+        var executionStrategy = _context.Database.CreateExecutionStrategy();
+        return await executionStrategy.ExecuteAsync(async () =>
+        {
+        await using var transaction = await _context.Database.BeginTransactionAsync();
         var interview = await Query().FirstOrDefaultAsync(item => item.Id == id);
         if (interview == null) return null;
         if (!CanManage(interview, actorId, isAdmin)) return null;
@@ -249,10 +284,45 @@ public sealed class InterviewService : IInterviewService
         interview.UpdatedAt = DateTime.UtcNow;
         _auditLog.Add("Interview.Cancelled", "Interview", interview.Id.ToString("D"),
             new { Status = InterviewStatus.Scheduled }, new { Status = InterviewStatus.Cancelled });
-        _outbox.Add("interview.cancelled", new { InterviewId = interview.Id, ApplicationId = interview.ApplicationId },
+        if (interview.Application.Status == ApplyStatus.Interview)
+        {
+            interview.Application.Status = ApplyStatus.Screening;
+            _context.ApplicationStatusHistories.Add(new ApplicationStatusHistory
+            {
+                Id = Guid.NewGuid(),
+                ApplicationId = interview.ApplicationId,
+                FromStatus = ApplyStatus.Interview,
+                ToStatus = ApplyStatus.Screening,
+                ChangedBy = actorId,
+                ChangedAt = DateTime.UtcNow,
+                Reason = "Interview cancelled; application returned to Screening"
+            });
+            _auditLog.Add("Application.StatusChanged", "Application", interview.ApplicationId.ToString("D"),
+                new { Status = ApplyStatus.Interview },
+                new { Status = ApplyStatus.Screening, Reason = "Interview cancelled" });
+            _outbox.Add("application.status.changed", new
+            {
+                ApplicationId = interview.ApplicationId,
+                CandidateId = interview.Application.CandidateId,
+                CandidateEmail = interview.Application.Candidate.Email,
+                JobTitle = interview.Application.JobPost.Title,
+                FromStatus = ApplyStatus.Interview,
+                ToStatus = ApplyStatus.Screening
+            }, $"application:{interview.ApplicationId:D}:status:Screening:interview-cancelled:{interview.Id:D}");
+        }
+        _outbox.Add("interview.cancelled", new
+        {
+            InterviewId = interview.Id,
+            ApplicationId = interview.ApplicationId,
+            CandidateId = interview.Application.CandidateId,
+            CandidateEmail = interview.Application.Candidate.Email,
+            JobTitle = interview.Application.JobPost.Title
+        },
             $"interview:{interview.Id:D}:cancelled");
         await SaveWithConcurrencyAsync();
+        await transaction.CommitAsync();
         return ToDto(interview);
+        });
     }
 
     private IQueryable<Interview> Query() => _context.Interviews

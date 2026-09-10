@@ -159,7 +159,25 @@ public sealed class BackgroundProcessingService : BackgroundService
                 await email.SendNewsletterAsync(root.GetProperty("Email").GetString() ?? string.Empty, titles, true);
                 break;
             case "interview.rescheduled":
+                await AddNotificationAsync(db, root.GetProperty("CandidateId").GetGuid(),
+                    $"Lịch phỏng vấn cho tin \"{root.GetProperty("JobTitle").GetString()}\" đã được thay đổi.",
+                    "interview_rescheduled", sourceId, cancellationToken);
+                await email.SendInterviewRescheduledAsync(
+                    root.GetProperty("CandidateEmail").GetString() ?? string.Empty,
+                    root.GetProperty("JobTitle").GetString() ?? string.Empty,
+                    root.GetProperty("StartAt").GetDateTime(),
+                    root.GetProperty("MeetingUrl").GetString(),
+                    root.GetProperty("Location").GetString(),
+                    true);
+                break;
             case "interview.cancelled":
+                await AddNotificationAsync(db, root.GetProperty("CandidateId").GetGuid(),
+                    $"Lịch phỏng vấn cho tin \"{root.GetProperty("JobTitle").GetString()}\" đã bị hủy.",
+                    "interview_cancelled", sourceId, cancellationToken);
+                await email.SendInterviewCancelledAsync(
+                    root.GetProperty("CandidateEmail").GetString() ?? string.Empty,
+                    root.GetProperty("JobTitle").GetString() ?? string.Empty,
+                    true);
                 break;
         }
     }

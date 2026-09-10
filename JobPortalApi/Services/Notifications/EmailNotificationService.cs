@@ -40,6 +40,17 @@ namespace JobPortalApi.Services.Notifications
             $"Lịch phỏng vấn của bạn bắt đầu lúc {startAt:u}. " +
             (!string.IsNullOrWhiteSpace(meetingUrl) ? $"Link: {meetingUrl}" : string.Empty), throwOnFailure);
 
+        public Task SendInterviewRescheduledAsync(string to, string jobTitle, DateTime startAt, string? meetingUrl, string? location, bool throwOnFailure = false) => SendAsync(
+            to,
+            $"Lịch phỏng vấn đã thay đổi: {jobTitle}",
+            $"Lịch phỏng vấn cho vị trí \"{jobTitle}\" đã được dời sang {startAt:u}. " +
+            (!string.IsNullOrWhiteSpace(meetingUrl) ? $"Link: {meetingUrl}" : $"Địa điểm: {location}"), throwOnFailure);
+
+        public Task SendInterviewCancelledAsync(string to, string jobTitle, bool throwOnFailure = false) => SendAsync(
+            to,
+            $"Lịch phỏng vấn đã hủy: {jobTitle}",
+            $"Lịch phỏng vấn cho vị trí \"{jobTitle}\" đã được hủy. Hồ sơ đã trở về bước Screening nếu còn phù hợp.", throwOnFailure);
+
         public Task SendNewsletterAsync(string to, IReadOnlyList<string> jobTitles, bool throwOnFailure = false) => SendAsync(
             to,
             "Việc làm mới trên JobPortal",

@@ -1,4 +1,5 @@
 ﻿using JobPortalApi.DTOs.CandidateProfile;
+using System.Data;
 using JobPortalApi.DTOs.CandidateProfileDto;
 using JobPortalApi.Models;
 using JobPortalApi.Services.Interface.User;
@@ -334,15 +335,40 @@ namespace JobPortalApi.Services.User
             var fileName = $"{Guid.NewGuid():D}.pdf";
             var filePath = PrivateCvStorage.Resolve(fileName)
                 ?? throw new InvalidOperationException("Không tạo được đường dẫn CV an toàn.");
-            await System.IO.File.WriteAllBytesAsync(filePath, content);
 
+            var temporaryPath = Path.Combine(
+                PrivateCvStorage.RootDirectory,
+                $"{Guid.NewGuid():D}.uploading");
             var oldPath = PrivateCvStorage.Resolve(profile.ResumeUrl);
-            if (oldPath != null && System.IO.File.Exists(oldPath))
-                System.IO.File.Delete(oldPath);
+            var executionStrategy = _context.Database.CreateExecutionStrategy();
+            await executionStrategy.ExecuteAsync(async () =>
+            {
+                try
+                {
+                    await System.IO.File.WriteAllBytesAsync(temporaryPath, content);
 
-            profile.ResumeUrl = fileName;
-            _context.candidateProfiles.Update(profile);
-            await _context.SaveChangesAsync();
+                    await using var transaction = await _context.Database.BeginTransactionAsync(IsolationLevel.ReadCommitted);
+                    profile.ResumeUrl = fileName;
+                    await _context.SaveChangesAsync();
+                    System.IO.File.Move(temporaryPath, filePath);
+                    await transaction.CommitAsync();
+                }
+                catch
+                {
+                    if (System.IO.File.Exists(temporaryPath))
+                        System.IO.File.Delete(temporaryPath);
+                    if (System.IO.File.Exists(filePath))
+                        System.IO.File.Delete(filePath);
+                    throw;
+                }
+            });
+
+            // File cũ không còn được DB tham chiếu; cleanup sau commit là best-effort.
+            if (oldPath != null && System.IO.File.Exists(oldPath))
+            {
+                try { System.IO.File.Delete(oldPath); }
+                catch (IOException) { }
+            }
 
             return "/api/candidate-profile/me/cv";
         }
@@ -353,14 +379,21 @@ namespace JobPortalApi.Services.User
                 return false;
 
             var filePath = PrivateCvStorage.Resolve(profile.ResumeUrl);
+            profile.ResumeUrl = null;
+            var executionStrategy = _context.Database.CreateExecutionStrategy();
+            await executionStrategy.ExecuteAsync(async () =>
+            {
+                await using var transaction = await _context.Database.BeginTransactionAsync(IsolationLevel.ReadCommitted);
+                await _context.SaveChangesAsync();
+                await transaction.CommitAsync();
+            });
+
+            // Xóa sau khi DB commit để DB không trỏ tới một file đã biến mất.
             if (filePath != null && File.Exists(filePath))
             {
-                File.Delete(filePath);
+                try { File.Delete(filePath); }
+                catch (IOException) { }
             }
-
-            profile.ResumeUrl = null;
-            _context.candidateProfiles.Update(profile);
-            await _context.SaveChangesAsync();
 
             return true;
         }
@@ -386,7 +419,8 @@ namespace JobPortalApi.Services.User
 
         public async Task<(byte[] Content, string FileName)?> GetCvAsync(Guid actorId, Guid candidateId, bool isAdmin = false)
         {
-            if (!isAdmin && !await _context.Jobs.AnyAsync(j =>
+            var isCandidateSelf = actorId == candidateId;
+            if (!isAdmin && !isCandidateSelf && !await _context.Jobs.AnyAsync(j =>
                     j.CandidateId == candidateId && j.JobPost.EmployerId == actorId))
                 return null;
 

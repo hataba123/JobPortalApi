@@ -89,15 +89,39 @@ namespace JobPortalApi.Services.User
         // Đăng nhập người dùng
         public async Task<string> LoginAsync(LoginRequest request)
         {
+            var email = request.Email?.Trim();
+            if (string.IsNullOrWhiteSpace(email) || string.IsNullOrWhiteSpace(request.Password))
+                throw new InvalidOperationException("Email hoặc mật khẩu không đúng.");
             // Tìm user theo email
-            var user = await _context.Users.FirstOrDefaultAsync(u => u.Email == request.Email);
+            var user = await _context.Users.FirstOrDefaultAsync(u => u.Email == email);
 
             // Nếu không tìm thấy hoặc mật khẩu sai thì báo lỗi
             if (user == null)
                 throw new InvalidOperationException("Email hoặc mật khẩu không đúng.");
 
-            if (!VerifyPassword(request.Password, user.PasswordHash))
+            var now = DateTime.UtcNow;
+            if (user.LockoutUntil > now)
                 throw new InvalidOperationException("Email hoặc mật khẩu không đúng.");
+
+            if (!VerifyPassword(request.Password, user.PasswordHash))
+            {
+                user.FailedLoginAttempts++;
+                var maxAttempts = GetPositiveSetting("AUTH_MAX_FAILED_LOGIN_ATTEMPTS", "Auth:MaxFailedLoginAttempts", 5);
+                if (user.FailedLoginAttempts >= maxAttempts)
+                {
+                    var lockoutMinutes = GetPositiveSetting("AUTH_LOCKOUT_MINUTES", "Auth:LockoutMinutes", 15);
+                    user.LockoutUntil = now.AddMinutes(lockoutMinutes);
+                }
+                await _context.SaveChangesAsync();
+                throw new InvalidOperationException("Email hoặc mật khẩu không đúng.");
+            }
+
+            if (user.FailedLoginAttempts != 0 || user.LockoutUntil.HasValue)
+            {
+                user.FailedLoginAttempts = 0;
+                user.LockoutUntil = null;
+                await _context.SaveChangesAsync();
+            }
             // Trả về JWT token
             return _jwtHelper.GenerateJwtToken(user); // ✅ Gọi helper
         }
@@ -180,6 +204,8 @@ namespace JobPortalApi.Services.User
 
             user.PasswordHash = HashPassword(request.NewPassword);
             user.PasswordVersion++;
+            user.FailedLoginAttempts = 0;
+            user.LockoutUntil = null;
             await _context.SaveChangesAsync();
         }
 
@@ -209,19 +235,25 @@ namespace JobPortalApi.Services.User
         public async Task ResetPasswordAsync(ResetPasswordRequest request)
         {
             var tokenHash = HashResetToken(request.Token);
-            await using var transaction = await _context.Database.BeginTransactionAsync();
-            var resetToken = await _context.PasswordResetTokens
-                .Include(t => t.User)
-                .FirstOrDefaultAsync(t => t.TokenHash == tokenHash);
-            if (resetToken == null || resetToken.UsedAt != null || resetToken.ExpiresAt <= DateTime.UtcNow ||
-                resetToken.User.Email != request.Email)
-                throw new InvalidOperationException("Mã đặt lại mật khẩu không hợp lệ hoặc đã hết hạn.");
+            var executionStrategy = _context.Database.CreateExecutionStrategy();
+            await executionStrategy.ExecuteAsync(async () =>
+            {
+                await using var transaction = await _context.Database.BeginTransactionAsync();
+                var resetToken = await _context.PasswordResetTokens
+                    .Include(t => t.User)
+                    .FirstOrDefaultAsync(t => t.TokenHash == tokenHash);
+                if (resetToken == null || resetToken.UsedAt != null || resetToken.ExpiresAt <= DateTime.UtcNow ||
+                    resetToken.User.Email != request.Email)
+                    throw new InvalidOperationException("Mã đặt lại mật khẩu không hợp lệ hoặc đã hết hạn.");
 
-            resetToken.UsedAt = DateTime.UtcNow;
-            resetToken.User.PasswordHash = HashPassword(request.NewPassword);
-            resetToken.User.PasswordVersion++;
-            await _context.SaveChangesAsync();
-            await transaction.CommitAsync();
+                resetToken.UsedAt = DateTime.UtcNow;
+                resetToken.User.PasswordHash = HashPassword(request.NewPassword);
+                resetToken.User.PasswordVersion++;
+                resetToken.User.FailedLoginAttempts = 0;
+                resetToken.User.LockoutUntil = null;
+                await _context.SaveChangesAsync();
+                await transaction.CommitAsync();
+            });
         }
 
         // Mã hoá mật khẩu bằng BCrypt
@@ -240,6 +272,13 @@ namespace JobPortalApi.Services.User
         {
             return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(token))).ToLowerInvariant();
         }
+
+        private int GetPositiveSetting(string environmentKey, string configurationKey, int defaultValue)
+        {
+            var rawValue = Environment.GetEnvironmentVariable(environmentKey) ?? _configuration[configurationKey];
+            return int.TryParse(rawValue, out var value) && value > 0 ? value : defaultValue;
+        }
+
         public async Task<UserDto> GetUserByEmailAsync(string email)
         {
             var user = await _context.Users

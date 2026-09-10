@@ -58,29 +58,39 @@ public sealed class ApplyService : IApplyService
             Status = ApplyStatus.Applied
         };
 
-        await using var transaction = await _context.Database.BeginTransactionAsync();
-        _context.Jobs.Add(application);
-        AddHistory(application, null, ApplyStatus.Applied, candidateId, null);
-        _auditLog.Add("Application.Created", "Application", application.Id.ToString("D"), null,
-            new { application.Id, application.JobPostId, application.CandidateId, application.Status });
-        _outbox.Add("application.created.notification", new
+        var executionStrategy = _context.Database.CreateExecutionStrategy();
+        await executionStrategy.ExecuteAsync(async () =>
         {
-            ApplicationId = application.Id,
-            EmployerId = jobPost.EmployerId,
-            CandidateId = candidateId,
-            CandidateEmail = await _context.Users.Where(user => user.Id == candidateId).Select(user => user.Email).FirstOrDefaultAsync(),
-            JobTitle = jobPost.Title
-        }, $"application:{application.Id:D}:created");
-        try
-        {
-            await _context.SaveChangesAsync();
-            await transaction.CommitAsync();
-        }
-        catch (DbUpdateException)
-        {
-            await transaction.RollbackAsync();
-            throw new ApiConflictException("Bạn đã ứng tuyển công việc này rồi.");
-        }
+            await using var transaction = await _context.Database.BeginTransactionAsync();
+            _context.Jobs.Add(application);
+            AddHistory(application, null, ApplyStatus.Applied, candidateId, null);
+            _auditLog.Add("Application.Created", "Application", application.Id.ToString("D"), null,
+                new { application.Id, application.JobPostId, application.CandidateId, application.Status });
+            _outbox.Add("application.created.notification", new
+            {
+                ApplicationId = application.Id,
+                EmployerId = jobPost.EmployerId,
+                CandidateId = candidateId,
+                CandidateEmail = await _context.Users.Where(user => user.Id == candidateId).Select(user => user.Email).FirstOrDefaultAsync(),
+                JobTitle = jobPost.Title
+            }, $"application:{application.Id:D}:created");
+            try
+            {
+                await _context.SaveChangesAsync();
+                var incremented = await _context.JobPosts
+                    .Where(post => post.Id == request.JobPostId)
+                    .ExecuteUpdateAsync(setters => setters
+                        .SetProperty(post => post.Applicants, post => post.Applicants + 1));
+                if (incremented != 1)
+                    throw new InvalidOperationException("Không thể cập nhật số lượng hồ sơ ứng tuyển.");
+                await transaction.CommitAsync();
+            }
+            catch (DbUpdateException)
+            {
+                await transaction.RollbackAsync();
+                throw new ApiConflictException("Bạn đã ứng tuyển công việc này rồi.");
+            }
+        });
     }
 
     public async Task<List<CandidateApplicationDto>> GetCandidatesAppliedToJob(Guid employerId, Guid jobPostId)
@@ -355,10 +365,20 @@ public sealed class ApplyService : IApplyService
 
     public async Task<bool> DeleteAsync(Guid id)
     {
-        var application = await _context.Jobs.FindAsync(id);
+        var application = await _context.Jobs.FirstOrDefaultAsync(item => item.Id == id);
         if (application == null) return false;
-        _context.Jobs.Remove(application);
-        await _context.SaveChangesAsync();
+        var executionStrategy = _context.Database.CreateExecutionStrategy();
+        await executionStrategy.ExecuteAsync(async () =>
+        {
+            await using var transaction = await _context.Database.BeginTransactionAsync();
+            _context.Jobs.Remove(application);
+            await _context.SaveChangesAsync();
+            await _context.JobPosts
+                .Where(post => post.Id == application.JobPostId && post.Applicants > 0)
+                .ExecuteUpdateAsync(setters => setters
+                    .SetProperty(post => post.Applicants, post => post.Applicants - 1));
+            await transaction.CommitAsync();
+        });
         return true;
     }
 

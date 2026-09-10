@@ -1,9 +1,11 @@
+using System.Data;
 using JobPortalApi.DTOs.JobPost;
 using JobPortalApi.DTOs.Shared;
 using JobPortalApi.Models;
 using JobPortalApi.Models.Enums;
 using JobPortalApi.Services.Interface.User;
 using JobPortalApi.Services.Infrastructure;
+using JobPortalApi.Services.Payments;
 using JobPortalApi.Middleware;
 using Microsoft.EntityFrameworkCore;
 
@@ -12,10 +14,12 @@ namespace JobPortalApi.Services.User
     public class JobService : IJobService
     {
         private readonly ApplicationDbContext _context;
+        private readonly CreditLedgerService _creditLedgerService;
 
-        public JobService(ApplicationDbContext context)
+        public JobService(ApplicationDbContext context, CreditLedgerService creditLedgerService)
         {
             _context = context;
+            _creditLedgerService = creditLedgerService;
         }
 
         public async Task<PagedResponse<JobPostDto>> GetAllAsync(int page = 1, int pageSize = 20)
@@ -98,31 +102,46 @@ namespace JobPortalApi.Services.User
                 requestedStatus != JobPostStatus.PendingApproval)
                 throw new ArgumentException("Recruiter chỉ được tạo tin ở trạng thái Draft hoặc PendingApproval.");
 
-            var job = new JobPost
+            var jobId = Guid.NewGuid();
+            var executionStrategy = _context.Database.CreateExecutionStrategy();
+            await executionStrategy.ExecuteAsync(async () =>
             {
-                Id = Guid.NewGuid(),
-                Title = dto.Title,
-                Description = dto.Description,
-                SkillsRequired = dto.SkillsRequired,
-                Location = dto.Location,
-                Salary = dto.Salary,
-                Type = dto.Type,
-                Logo = dto.Logo,
-                Tags = dto.Tags ?? new List<string>(),
-                CreatedAt = DateTime.UtcNow,
-                ExpiresAt = dto.ExpiresAt,
-                Status = requestedStatus,
-                MinExperienceYears = dto.MinExperienceYears,
-                EducationRequirement = dto.EducationRequirement,
-                CategoryId = dto.CategoryId,
-                CompanyId = dto.CompanyId,
-                EmployerId = employerId
-            };
+                await using var transaction = await _context.Database.BeginTransactionAsync(IsolationLevel.Serializable);
+                var job = new JobPost
+                {
+                    Id = jobId,
+                    Title = dto.Title,
+                    Description = dto.Description,
+                    SkillsRequired = dto.SkillsRequired,
+                    Location = dto.Location,
+                    Salary = dto.Salary,
+                    Type = dto.Type,
+                    Logo = dto.Logo,
+                    Tags = dto.Tags ?? new List<string>(),
+                    CreatedAt = DateTime.UtcNow,
+                    ExpiresAt = dto.ExpiresAt,
+                    Status = requestedStatus,
+                    MinExperienceYears = dto.MinExperienceYears,
+                    EducationRequirement = dto.EducationRequirement,
+                    CategoryId = dto.CategoryId,
+                    CompanyId = dto.CompanyId,
+                    EmployerId = employerId
+                };
 
-            _context.JobPosts.Add(job);
-            await _context.SaveChangesAsync();
+                var consumed = await _creditLedgerService.TryConsumeAsync(
+                    employerId,
+                    CreditType.JobPost,
+                    quantity: 1,
+                    idempotencyKey: $"jobpost:create:{job.Id}");
+                if (!consumed)
+                    throw new InvalidOperationException("Bạn không còn tín dụng đăng tin.");
 
-            return await GetForManagementAsync(job.Id)
+                _context.JobPosts.Add(job);
+                await _context.SaveChangesAsync();
+                await transaction.CommitAsync();
+            });
+
+            return await GetForManagementAsync(jobId)
                 ?? throw new InvalidOperationException("Không thể đọc lại tin tuyển dụng vừa tạo.");
         }
 

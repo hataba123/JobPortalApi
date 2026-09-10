@@ -8,7 +8,6 @@ using Microsoft.AspNetCore.RateLimiting;
 
 namespace JobPortalApi.Controllers.Auth;
 
-[AllowAnonymous]
 [EnableRateLimiting("auth")]
 [Route("api/[controller]")]
 [ApiController]
@@ -22,6 +21,7 @@ public class AuthController : ControllerBase
     }
 
     [HttpPost("register")]
+    [AllowAnonymous]
     [ProducesResponseType(typeof(AuthResponse), StatusCodes.Status200OK)]
     public async Task<IActionResult> Register([FromBody] RegisterRequest request)
     {
@@ -31,6 +31,7 @@ public class AuthController : ControllerBase
     }
 
     [HttpPost("login")]
+    [AllowAnonymous]
     [ProducesResponseType(typeof(AuthResponse), StatusCodes.Status200OK)]
     public async Task<IActionResult> Login([FromBody] LoginRequest request)
     {
@@ -51,6 +52,7 @@ public class AuthController : ControllerBase
     }
 
     [HttpPost("oauth-login")]
+    [AllowAnonymous]
     public async Task<IActionResult> OAuthLogin(
         [FromBody] OAuthLoginRequest request,
         [FromHeader(Name = "X-OAuth-Exchange-Secret")] string exchangeSecret)
@@ -68,6 +70,7 @@ public class AuthController : ControllerBase
     }
 
     [HttpPost("forgot-password")]
+    [AllowAnonymous]
     public async Task<IActionResult> ForgotPassword([FromBody] ForgotPasswordRequest request)
     {
         await _authService.CreatePasswordResetRequestAsync(request.Email);
@@ -75,6 +78,7 @@ public class AuthController : ControllerBase
     }
 
     [HttpPost("reset-password")]
+    [AllowAnonymous]
     public async Task<IActionResult> ResetPassword([FromBody] ResetPasswordRequest request)
     {
         await _authService.ResetPasswordAsync(request);
