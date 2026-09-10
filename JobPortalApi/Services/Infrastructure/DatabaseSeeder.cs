@@ -108,7 +108,107 @@ namespace JobPortalApi.Services.Infrastructure
                 entitlement.ExpiresInDays = 30;
             }
 
+            var blogAuthor = await UpsertBlogAuthorAsync(
+                context,
+                "JobPortal Editorial Team",
+                "/uploads/logo/jobportal-demo.svg",
+                "Admin");
             await context.SaveChangesAsync();
+
+            await UpsertBlogAsync(
+                context,
+                blogAuthor.Id,
+                "xay-dung-ho-so-nghe-nghiep-noi-bat",
+                "Cách xây dựng hồ sơ nghề nghiệp nổi bật năm 2026",
+                "Một hồ sơ rõ ràng, có số liệu và tập trung vào kết quả giúp nhà tuyển dụng hiểu nhanh giá trị của bạn.",
+                "Bắt đầu bằng phần giới thiệu ngắn, sau đó ưu tiên thành tựu có thể đo lường và các kỹ năng phù hợp với vị trí đang ứng tuyển. Hãy cập nhật hồ sơ định kỳ để phản ánh đúng kinh nghiệm mới nhất.",
+                "Phát triển sự nghiệp",
+                new[] { "CV", "Career", "Job search" },
+                "6 phút",
+                true,
+                "/uploads/images/blog-career-profile.jpg",
+                new DateTime(2026, 8, 20, 8, 0, 0, DateTimeKind.Utc));
+            await UpsertBlogAsync(
+                context,
+                blogAuthor.Id,
+                "ky-nang-cong-tac-trong-doi-ngu",
+                "Kỹ năng cộng tác giúp bạn nổi bật trong đội ngũ",
+                "Giao tiếp chủ động, phản hồi có cấu trúc và tinh thần chia sẻ là nền tảng của mọi đội ngũ hiệu quả.",
+                "Khi làm việc nhóm, hãy thống nhất mục tiêu, ghi nhận trách nhiệm và chia sẻ tiến độ minh bạch. Những thói quen nhỏ này giúp giảm hiểu nhầm và tạo niềm tin lâu dài giữa các thành viên.",
+                "Kỹ năng",
+                new[] { "Teamwork", "Soft skills", "Productivity" },
+                "5 phút",
+                true,
+                "/uploads/images/blog-team-collaboration.jpg",
+                new DateTime(2026, 8, 12, 8, 0, 0, DateTimeKind.Utc));
+            await UpsertBlogAsync(
+                context,
+                blogAuthor.Id,
+                "checklist-chuan-bi-phong-van-cong-nghe",
+                "Checklist chuẩn bị phỏng vấn vị trí công nghệ",
+                "Từ nghiên cứu công ty đến phần trình bày dự án, đây là checklist ngắn giúp bạn tự tin trước buổi phỏng vấn.",
+                "Đọc kỹ mô tả công việc, chuẩn bị hai đến ba câu chuyện theo mô hình STAR và kiểm tra lại các dự án có liên quan. Cuối buổi, hãy đặt câu hỏi về đội ngũ, kỳ vọng 90 ngày đầu và cách đo lường thành công.",
+                "Phỏng vấn",
+                new[] { "Interview", "Technology", "Preparation" },
+                "7 phút",
+                false,
+                "/uploads/images/blog-tech-workspace.jpg",
+                new DateTime(2026, 8, 5, 8, 0, 0, DateTimeKind.Utc));
+
+            await context.SaveChangesAsync();
+        }
+
+        private static async Task<BlogAuthor> UpsertBlogAuthorAsync(
+            ApplicationDbContext context,
+            string name,
+            string avatar,
+            string role)
+        {
+            var author = await context.BlogAuthors.FirstOrDefaultAsync(item => item.Name == name);
+            if (author == null)
+            {
+                author = new BlogAuthor { Name = name };
+                context.BlogAuthors.Add(author);
+            }
+
+            author.Name = name;
+            author.Avatar = avatar;
+            author.Role = role;
+            return author;
+        }
+
+        private static async Task UpsertBlogAsync(
+            ApplicationDbContext context,
+            int authorId,
+            string slug,
+            string title,
+            string excerpt,
+            string content,
+            string category,
+            string[] tags,
+            string readTime,
+            bool featured,
+            string image,
+            DateTime publishedAt)
+        {
+            var blog = await context.Blogs.FirstOrDefaultAsync(item => item.Slug == slug);
+            if (blog == null)
+            {
+                blog = new Blog { Slug = slug };
+                context.Blogs.Add(blog);
+            }
+
+            blog.Title = title;
+            blog.Excerpt = excerpt;
+            blog.Content = content;
+            blog.Slug = slug;
+            blog.Category = category;
+            blog.SetTagsArray(tags);
+            blog.PublishedAt = publishedAt;
+            blog.ReadTime = readTime;
+            blog.Featured = featured;
+            blog.Image = image;
+            blog.AuthorId = authorId;
         }
 
         private static async Task UpsertUserAsync(
