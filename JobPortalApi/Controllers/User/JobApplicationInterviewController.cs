@@ -9,7 +9,7 @@ namespace JobPortalApi.Controllers.User;
 
 [ApiController]
 [Route("api/jobapplication/{applicationId:guid}/interviews")]
-[Authorize(Roles = "Admin,Recruiter")]
+[Authorize(Roles = "Recruiter")]
 public sealed class JobApplicationInterviewController : ControllerBase
 {
     private readonly IInterviewService _service;
