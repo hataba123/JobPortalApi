@@ -24,7 +24,7 @@ namespace JobPortalApi.Controllers.User
             var candidateId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
             try
             {
-                return Ok(await _matchingService.GetRecommendedJobsAsync(candidateId, query));
+                return Ok(await _matchingService.GetRecommendedJobsAsync(candidateId, query, HttpContext.RequestAborted));
             }
             catch (KeyNotFoundException ex)
             {
@@ -39,7 +39,7 @@ namespace JobPortalApi.Controllers.User
             var actorId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
             try
             {
-                return Ok(await _matchingService.RankCandidatesAsync(actorId, jobPostId, User.IsInRole("Admin"), query));
+                return Ok(await _matchingService.RankCandidatesAsync(actorId, jobPostId, User.IsInRole("Admin"), query, HttpContext.RequestAborted));
             }
             catch (KeyNotFoundException ex)
             {
@@ -58,7 +58,7 @@ namespace JobPortalApi.Controllers.User
             var actorId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
             try
             {
-                return Ok(await _matchingService.GetCandidateMatchAsync(actorId, jobPostId, candidateId, User.IsInRole("Admin")));
+                return Ok(await _matchingService.GetCandidateMatchAsync(actorId, jobPostId, candidateId, User.IsInRole("Admin"), HttpContext.RequestAborted));
             }
             catch (KeyNotFoundException ex)
             {

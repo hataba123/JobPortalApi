@@ -22,11 +22,11 @@ namespace JobPortalApi.Controllers.User
 
         [HttpGet]
         [AllowAnonymous]
-        public async Task<IActionResult> GetAll([FromQuery] int page = 1, [FromQuery] int pageSize = 20)
+        public async Task<IActionResult> GetAll([FromQuery] JobPostQuery query)
         {
-            if (page < 1 || pageSize < 1 || pageSize > 100)
+            if (query.Page < 1 || query.PageSize < 1 || query.PageSize > 100 || query.MinSalary < 0)
                 return BadRequest(new { message = "page phải >= 1 và pageSize phải trong khoảng 1-100." });
-            var posts = await _jobService.GetAllAsync(page, pageSize);
+            var posts = await _jobService.GetAllAsync(query);
             return Ok(posts);
         }
         [HttpGet("company/{companyId}")]

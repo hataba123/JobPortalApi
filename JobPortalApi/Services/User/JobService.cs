@@ -15,18 +15,34 @@ namespace JobPortalApi.Services.User
     {
         private readonly ApplicationDbContext _context;
         private readonly CreditLedgerService _creditLedgerService;
+        private readonly IOutboxService _outbox;
 
-        public JobService(ApplicationDbContext context, CreditLedgerService creditLedgerService)
+        public JobService(ApplicationDbContext context, CreditLedgerService creditLedgerService, IOutboxService outbox)
         {
             _context = context;
             _creditLedgerService = creditLedgerService;
+            _outbox = outbox;
         }
 
-        public async Task<PagedResponse<JobPostDto>> GetAllAsync(int page = 1, int pageSize = 20)
+        public async Task<PagedResponse<JobPostDto>> GetAllAsync(JobPostQuery request)
         {
-            page = Math.Max(1, page);
-            pageSize = Math.Clamp(pageSize, 1, 100);
+            var page = Math.Max(1, request.Page);
+            var pageSize = Math.Clamp(request.PageSize, 1, 100);
             var query = ActivePosts(_context.JobPosts);
+            if (!string.IsNullOrWhiteSpace(request.Search))
+            {
+                var search = request.Search.Trim();
+                query = query.Where(job => job.Title.Contains(search) ||
+                    job.Description.Contains(search) || job.SkillsRequired.Contains(search));
+            }
+            if (!string.IsNullOrWhiteSpace(request.Location))
+                query = query.Where(job => job.Location == request.Location.Trim());
+            if (!string.IsNullOrWhiteSpace(request.Type))
+                query = query.Where(job => job.Type == request.Type.Trim());
+            if (request.CategoryId.HasValue)
+                query = query.Where(job => job.CategoryId == request.CategoryId.Value);
+            if (request.MinSalary.HasValue)
+                query = query.Where(job => job.Salary >= request.MinSalary.Value);
             var total = await query.CountAsync();
             var entities = await query
                 .AsNoTracking()
@@ -173,6 +189,14 @@ namespace JobPortalApi.Services.User
                 job.EducationRequirement = dto.EducationRequirement;
             if (dto.Status.HasValue)
                 job.Status = dto.Status.Value;
+
+            if (job.Status == JobPostStatus.Active)
+            {
+                _outbox.Add(
+                    "matching.job.refresh",
+                    new { JobPostId = job.Id },
+                    $"matching:job:{job.Id:D}:changed:{Guid.NewGuid():D}");
+            }
 
             try { await _context.SaveChangesAsync(); }
             catch (DbUpdateConcurrencyException)

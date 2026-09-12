@@ -10,16 +10,24 @@ using Microsoft.EntityFrameworkCore;
 using System.Security.Claims;
 using JobPortalApi.DTOs.Shared;
 using JobPortalApi.Services.Infrastructure;
+using JobPortalApi.Services.Media;
 
 namespace JobPortalApi.Services.User
 {
     public class RecruiterCandidateService : IRecruiterCandidateService
     {
         private readonly ApplicationDbContext _context;
+        private readonly IOutboxService _outbox;
+        private readonly IClamAvScanner _clamAvScanner;
 
-        public RecruiterCandidateService(ApplicationDbContext context)
+        public RecruiterCandidateService(
+            ApplicationDbContext context,
+            IOutboxService outbox,
+            IClamAvScanner clamAvScanner)
         {
             _context = context;
+            _outbox = outbox;
+            _clamAvScanner = clamAvScanner;
         }
 
         public async Task<IEnumerable<CandidateProfileBriefDto>> SearchCandidatesAsync(Guid recruiterId, CandidateSearchRequest request)
@@ -32,7 +40,11 @@ namespace JobPortalApi.Services.User
         {
             var page = Math.Max(1, request.Page);
             var pageSize = Math.Clamp(request.PageSize, 1, 100);
-            var query = _context.candidateProfiles.AsNoTracking();
+            // Hồ sơ ẩn vẫn có thể được xem trong hồ sơ đã ứng tuyển, nhưng không
+            // xuất hiện trong tìm kiếm chủ động của nhà tuyển dụng.
+            var query = _context.candidateProfiles
+                .AsNoTracking()
+                .Where(candidate => candidate.User.ProfileVisibility);
 
             if (!string.IsNullOrWhiteSpace(request.Keyword))
             {
@@ -313,6 +325,11 @@ namespace JobPortalApi.Services.User
             if (!string.IsNullOrEmpty(dto.Email))
                 profile.User.Email = dto.Email;
             _context.candidateProfiles.Update(profile);
+            // Hồ sơ đổi thì chỉ xếp hạng lại cho ứng viên này ở worker nền.
+            _outbox.Add(
+                "matching.candidate.refresh",
+                new { CandidateId = userId },
+                $"matching:candidate:{userId:D}:profile:{Guid.NewGuid():D}");
             await _context.SaveChangesAsync();
             return true;
         }
@@ -346,6 +363,7 @@ namespace JobPortalApi.Services.User
                 try
                 {
                     await System.IO.File.WriteAllBytesAsync(temporaryPath, content);
+                    await _clamAvScanner.ScanAsync(temporaryPath);
 
                     await using var transaction = await _context.Database.BeginTransactionAsync(IsolationLevel.ReadCommitted);
                     profile.ResumeUrl = fileName;
@@ -430,6 +448,7 @@ namespace JobPortalApi.Services.User
                 .FirstOrDefaultAsync();
             var path = PrivateCvStorage.Resolve(storageKey);
             if (path == null || !File.Exists(path)) return null;
+            await _clamAvScanner.ScanAsync(path);
             return (await File.ReadAllBytesAsync(path), "resume.pdf");
         }
 

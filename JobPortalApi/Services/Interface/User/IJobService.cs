@@ -6,7 +6,7 @@ namespace JobPortalApi.Services.Interface.User
 {
     public interface IJobService
     {
-        Task<PagedResponse<JobPostDto>> GetAllAsync(int page = 1, int pageSize = 20);
+        Task<PagedResponse<JobPostDto>> GetAllAsync(JobPostQuery query);
         Task<JobPostDto?> GetByIdAsync(Guid id);
         Task<IEnumerable<JobPostDto>> GetByEmployerIdAsync(Guid employerId);
         Task<JobPostDto> CreateAsync(CreateJobPostDto dto, Guid employerId);

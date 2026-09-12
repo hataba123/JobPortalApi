@@ -2,6 +2,8 @@ using System.Text.Json;
 using System.Text.Encodings.Web;
 using JobPortalApi.DTOs.Matching;
 using JobPortalApi.Models;
+using JobPortalApi.Models.Enums;
+using JobPortalApi.Services.Infrastructure;
 using Microsoft.EntityFrameworkCore;
 
 namespace JobPortalApi.Services.Matching
@@ -9,102 +11,183 @@ namespace JobPortalApi.Services.Matching
     public class MatchingService
     {
         private readonly ApplicationDbContext _context;
+        private readonly IOutboxService _outbox;
 
-        public MatchingService(ApplicationDbContext context)
+        public MatchingService(ApplicationDbContext context, IOutboxService outbox)
         {
             _context = context;
+            _outbox = outbox;
         }
 
-        public async Task<PagedMatchesDto> GetRecommendedJobsAsync(Guid candidateId, MatchQueryDto query)
+        public async Task<PagedMatchesDto> GetRecommendedJobsAsync(Guid candidateId, MatchQueryDto query, CancellationToken cancellationToken = default)
         {
             var profile = await _context.candidateProfiles
                 .AsNoTracking()
-                .FirstOrDefaultAsync(p => p.UserId == candidateId);
+                .FirstOrDefaultAsync(p => p.UserId == candidateId, cancellationToken);
             if (profile == null) throw new KeyNotFoundException("Hồ sơ ứng viên chưa tồn tại.");
 
-            var jobs = await ActiveJobs().AsNoTracking().ToListAsync();
-            var existingResults = await _context.MatchResults
-                .Where(item => item.CandidateId == candidateId && jobs.Select(job => job.Id).Contains(item.JobPostId))
-                .ToDictionaryAsync(item => item.JobPostId);
-            var candidateInput = ToCandidateInput(profile);
-            var matches = new List<MatchResultDto>();
-            foreach (var job in jobs)
-            {
-                var result = MatchingEngine.Calculate(candidateInput, ToJobInput(job));
-                UpsertResult(existingResults, result);
-                matches.Add(WithJob(result, job));
-            }
-            await _context.SaveChangesAsync();
+            var now = DateTime.UtcNow;
+            var resultQuery = _context.MatchResults
+                .AsNoTracking()
+                .Where(item => item.CandidateId == candidateId && item.TotalScore >= query.MinScore)
+                .Where(item => item.JobPost.Status == JobPostStatus.Active &&
+                    (!item.JobPost.ExpiresAt.HasValue || item.JobPost.ExpiresAt > now));
+            var total = await resultQuery.CountAsync(cancellationToken);
+            var results = await resultQuery
+                .OrderByDescending(item => item.TotalScore)
+                .ThenBy(item => item.JobPostId)
+                .Include(item => item.JobPost)
+                .Skip((query.Page - 1) * query.PageSize)
+                .Take(query.PageSize)
+                .ToListAsync(cancellationToken);
 
-            var filtered = matches
-                .Where(m => m.TotalScore >= query.MinScore)
-                .OrderByDescending(m => m.TotalScore)
-                .ToList();
-            return Page(filtered, query);
+            var pending = await HasPendingCandidateRefreshAsync(candidateId, cancellationToken);
+            if (!pending)
+            {
+                var refreshKey = await GetCandidateRefreshKeyAsync(candidateId, cancellationToken);
+                if (refreshKey != null)
+                    pending = await QueueCandidateRefreshIfNeededAsync(candidateId, refreshKey, cancellationToken);
+            }
+            return new PagedMatchesDto
+            {
+                Items = results.Select(ToDto).ToList(),
+                Page = query.Page,
+                PageSize = query.PageSize,
+                Total = total,
+                IsPending = pending
+            };
         }
 
-        public async Task<PagedMatchesDto> RankCandidatesAsync(Guid actorId, Guid jobPostId, bool isAdmin, MatchQueryDto query)
+        public async Task RefreshCandidateMatchesAsync(
+            Guid candidateId,
+            int batchSize,
+            DateTime? beforeCreatedAt,
+            Guid? afterJobId,
+            CancellationToken cancellationToken)
+        {
+            var profile = await _context.candidateProfiles.AsNoTracking()
+                .FirstOrDefaultAsync(item => item.UserId == candidateId, cancellationToken);
+            if (profile == null) return;
+
+            var take = Math.Clamp(batchSize, 1, 500);
+            var jobsQuery = ActiveJobs().AsNoTracking();
+            if (beforeCreatedAt.HasValue && afterJobId.HasValue)
+            {
+                jobsQuery = jobsQuery.Where(item => item.CreatedAt < beforeCreatedAt.Value ||
+                    (item.CreatedAt == beforeCreatedAt.Value && item.Id.CompareTo(afterJobId.Value) > 0));
+            }
+
+            var jobs = await jobsQuery
+                .OrderByDescending(item => item.CreatedAt).ThenBy(item => item.Id)
+                .Take(take + 1)
+                .ToListAsync(cancellationToken);
+            var hasMore = jobs.Count > take;
+            if (hasMore) jobs = jobs.Take(take).ToList();
+            if (jobs.Count == 0) return;
+            var jobIds = jobs.Select(item => item.Id).ToArray();
+            var existingResults = await _context.MatchResults
+                .Where(item => item.CandidateId == candidateId && jobIds.Contains(item.JobPostId))
+                .ToDictionaryAsync(item => item.JobPostId, cancellationToken);
+            var candidateInput = ToCandidateInput(profile);
+            foreach (var job in jobs)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                UpsertResult(existingResults, MatchingEngine.Calculate(candidateInput, ToJobInput(job)));
+            }
+            await _context.SaveChangesAsync(cancellationToken);
+            if (hasMore)
+            {
+                var last = jobs[^1];
+                var key = $"matching:candidate:{candidateId:D}:after:{last.CreatedAt.Ticks}:{last.Id:D}";
+                _outbox.Add("matching.candidate.refresh", new
+                {
+                    CandidateId = candidateId,
+                    CursorCreatedAt = last.CreatedAt,
+                    CursorJobId = last.Id
+                }, key);
+            }
+        }
+
+        public async Task<PagedMatchesDto> RankCandidatesAsync(Guid actorId, Guid jobPostId, bool isAdmin, MatchQueryDto query, CancellationToken cancellationToken = default)
         {
             var job = await _context.JobPosts
                 .AsNoTracking()
-                .FirstOrDefaultAsync(j => j.Id == jobPostId);
+                .FirstOrDefaultAsync(j => j.Id == jobPostId, cancellationToken);
             if (job == null) throw new KeyNotFoundException("Không tìm thấy tin tuyển dụng.");
             if (!isAdmin && job.EmployerId != actorId)
                 throw new UnauthorizedAccessException("Bạn không có quyền xem xếp hạng tin này.");
 
-            var applications = await _context.Jobs
-                .Where(a => a.JobPostId == jobPostId)
-                .Include(a => a.Candidate)
-                .AsNoTracking()
-                .ToListAsync();
-            var candidateIds = applications.Select(a => a.CandidateId).ToArray();
-            var profiles = await _context.candidateProfiles
-                .Where(p => candidateIds.Contains(p.UserId))
-                .AsNoTracking()
-                .ToDictionaryAsync(p => p.UserId);
-            var existingResults = await _context.MatchResults
-                .Where(item => item.JobPostId == jobPostId && candidateIds.Contains(item.CandidateId))
-                .ToDictionaryAsync(item => item.CandidateId);
-
-            var matches = new List<MatchResultDto>();
-            foreach (var application in applications)
+            var resultQuery = _context.MatchResults.AsNoTracking()
+                .Where(item => item.JobPostId == jobPostId && item.TotalScore >= query.MinScore);
+            var total = await resultQuery.CountAsync(cancellationToken);
+            var results = await resultQuery
+                .OrderByDescending(item => item.TotalScore).ThenBy(item => item.CandidateId)
+                .Include(item => item.Candidate)
+                .Skip((query.Page - 1) * query.PageSize).Take(query.PageSize)
+                .ToListAsync(cancellationToken);
+            var pending = await HasPendingJobRefreshAsync(jobPostId, cancellationToken);
+            if (!pending)
             {
-                if (!profiles.TryGetValue(application.CandidateId, out var profile)) continue;
-                var result = MatchingEngine.Calculate(ToCandidateInput(profile), ToJobInput(job));
-                UpsertResult(existingResults, result, result.CandidateId);
-                matches.Add(new MatchResultDto
-                {
-                    JobPostId = result.JobPostId,
-                    CandidateId = result.CandidateId,
-                    TotalScore = result.TotalScore,
-                    AlgorithmVersion = result.AlgorithmVersion,
-                    Breakdown = ToBreakdownDto(result.Breakdown),
-                    MatchedSkills = result.MatchedSkills.ToList(),
-                    MissingSkills = result.MissingSkills.ToList(),
-                    Reason = result.Reason,
-                    InputFingerprint = result.InputFingerprint,
-                    Candidate = new MatchCandidateSummaryDto
-                    {
-                        Id = application.Candidate.Id,
-                        FullName = application.Candidate.FullName,
-                        Email = application.Candidate.Email,
-                    },
-                });
+                var refreshKey = await GetJobRankingRefreshKeyAsync(jobPostId, cancellationToken);
+                if (refreshKey != null)
+                    pending = await QueueJobRankingRefreshIfNeededAsync(jobPostId, refreshKey, cancellationToken);
             }
-            await _context.SaveChangesAsync();
-
-            var filtered = matches
-                .Where(m => m.TotalScore >= query.MinScore)
-                .OrderByDescending(m => m.TotalScore)
-                .ToList();
-            return Page(filtered, query);
+            return new PagedMatchesDto
+            {
+                Items = results.Select(ToDto).ToList(),
+                Page = query.Page,
+                PageSize = query.PageSize,
+                Total = total,
+                IsPending = pending
+            };
         }
 
-        public async Task<MatchResultDto> GetCandidateMatchAsync(Guid actorId, Guid jobPostId, Guid candidateId, bool isAdmin)
+        public async Task RefreshJobCandidateMatchesAsync(
+            Guid jobPostId,
+            int batchSize,
+            Guid? afterApplicationId,
+            CancellationToken cancellationToken)
+        {
+            var job = await _context.JobPosts.AsNoTracking().FirstOrDefaultAsync(item => item.Id == jobPostId, cancellationToken);
+            if (job == null) return;
+
+            var take = Math.Clamp(batchSize, 1, 500);
+            var applicationsQuery = _context.Jobs.Where(item => item.JobPostId == jobPostId);
+            if (afterApplicationId.HasValue)
+                applicationsQuery = applicationsQuery.Where(item => item.Id.CompareTo(afterApplicationId.Value) > 0);
+            var applications = await applicationsQuery
+                .OrderBy(item => item.Id).Take(take + 1).AsNoTracking().ToListAsync(cancellationToken);
+            var hasMore = applications.Count > take;
+            if (hasMore) applications = applications.Take(take).ToList();
+            var candidateIds = applications.Select(item => item.CandidateId).Distinct().ToArray();
+            var profiles = await _context.candidateProfiles.Where(item => candidateIds.Contains(item.UserId))
+                .AsNoTracking().ToDictionaryAsync(item => item.UserId, cancellationToken);
+            var existingResults = await _context.MatchResults.Where(item => item.JobPostId == jobPostId && candidateIds.Contains(item.CandidateId))
+                .ToDictionaryAsync(item => item.CandidateId, cancellationToken);
+            foreach (var candidateId in candidateIds)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                if (!profiles.TryGetValue(candidateId, out var profile)) continue;
+                UpsertResult(existingResults, MatchingEngine.Calculate(ToCandidateInput(profile), ToJobInput(job)), candidateId);
+            }
+            await _context.SaveChangesAsync(cancellationToken);
+            if (hasMore)
+            {
+                var last = applications[^1];
+                var key = $"matching:job:{jobPostId:D}:after:{last.Id:D}";
+                _outbox.Add("matching.job.refresh", new
+                {
+                    JobPostId = jobPostId,
+                    CursorApplicationId = last.Id
+                }, key);
+            }
+        }
+
+        public async Task<MatchResultDto> GetCandidateMatchAsync(Guid actorId, Guid jobPostId, Guid candidateId, bool isAdmin, CancellationToken cancellationToken = default)
         {
             var job = await _context.JobPosts
                 .AsNoTracking()
-                .FirstOrDefaultAsync(j => j.Id == jobPostId);
+                .FirstOrDefaultAsync(j => j.Id == jobPostId, cancellationToken);
             if (job == null) throw new KeyNotFoundException("Không tìm thấy tin tuyển dụng.");
             if (!isAdmin && job.EmployerId != actorId)
                 throw new UnauthorizedAccessException("Bạn không có quyền xem xếp hạng tin này.");
@@ -113,17 +196,17 @@ namespace JobPortalApi.Services.Matching
                 .Where(a => a.JobPostId == jobPostId && a.CandidateId == candidateId)
                 .Include(a => a.Candidate)
                 .AsNoTracking()
-                .FirstOrDefaultAsync();
+                .FirstOrDefaultAsync(cancellationToken);
             if (item == null) throw new KeyNotFoundException("Ứng viên chưa ứng tuyển hoặc chưa có hồ sơ.");
 
             var profile = await _context.candidateProfiles
                 .AsNoTracking()
-                .FirstOrDefaultAsync(p => p.UserId == candidateId);
+                .FirstOrDefaultAsync(p => p.UserId == candidateId, cancellationToken);
             if (profile == null) throw new KeyNotFoundException("Ứng viên chưa ứng tuyển hoặc chưa có hồ sơ.");
 
             var result = MatchingEngine.Calculate(ToCandidateInput(profile), ToJobInput(job));
             await UpsertResultAsync(result);
-            await _context.SaveChangesAsync();
+            await _context.SaveChangesAsync(cancellationToken);
             return new MatchResultDto
             {
                 JobPostId = result.JobPostId,
@@ -181,6 +264,13 @@ namespace JobPortalApi.Services.Matching
                     mutableResults[lookupKey] = entity;
                 _context.MatchResults.Add(entity);
             }
+            else if (entity.AlgorithmVersion == result.AlgorithmVersion &&
+                     string.Equals(entity.InputFingerprint, result.InputFingerprint, StringComparison.Ordinal))
+            {
+                // Hồ sơ và tin chưa đổi; giữ nguyên CreatedAt để worker không
+                // ghi lại hàng loạt kết quả giống nhau.
+                return;
+            }
             entity.TotalScore = result.TotalScore;
             entity.BreakdownJson = JsonSerializer.Serialize(ToBreakdownDto(result.Breakdown));
             entity.MatchedSkillsJson = JsonSerializer.Serialize(result.MatchedSkills);
@@ -190,6 +280,167 @@ namespace JobPortalApi.Services.Matching
             entity.InputFingerprint = result.InputFingerprint;
             entity.CreatedAt = DateTime.UtcNow;
         }
+
+        private async Task<string?> GetCandidateRefreshKeyAsync(Guid candidateId, CancellationToken cancellationToken)
+        {
+            var baseKey = $"matching:candidate:{candidateId:D}";
+            var lastCompletedRefresh = await _context.OutboxMessages
+                .AsNoTracking()
+                .Where(message => message.Type == "matching.candidate.refresh" &&
+                                  message.DeduplicationKey != null &&
+                                  (message.DeduplicationKey == baseKey ||
+                                   message.DeduplicationKey.StartsWith(baseKey + ":")) &&
+                                  message.ProcessedAt != null)
+                .MaxAsync(message => (DateTime?)message.ProcessedAt, cancellationToken);
+            var newestJob = await ActiveJobs()
+                .AsNoTracking()
+                .OrderByDescending(job => job.CreatedAt)
+                .ThenByDescending(job => job.Id)
+                .Select(job => new { job.CreatedAt, job.Id })
+                .FirstOrDefaultAsync(cancellationToken);
+
+            if (newestJob == null)
+                return lastCompletedRefresh.HasValue ? null : baseKey;
+            if (!lastCompletedRefresh.HasValue || newestJob.CreatedAt > lastCompletedRefresh.Value)
+                return $"{baseKey}:jobs:{newestJob.CreatedAt.Ticks}:{newestJob.Id:D}";
+            return null;
+        }
+
+        private async Task<bool> QueueCandidateRefreshIfNeededAsync(
+            Guid candidateId,
+            string key,
+            CancellationToken cancellationToken)
+        {
+            var existing = await _context.OutboxMessages
+                .AsNoTracking()
+                .Where(message => message.DeduplicationKey == key)
+                .Select(message => new { message.ProcessedAt, message.DeadLetteredAt })
+                .SingleOrDefaultAsync(cancellationToken);
+            if (existing != null)
+                return existing.ProcessedAt == null && existing.DeadLetteredAt == null;
+
+            _outbox.Add("matching.candidate.refresh", new { CandidateId = candidateId }, key);
+            try
+            {
+                await _context.SaveChangesAsync(cancellationToken);
+            }
+            catch (DbUpdateException exception) when (IsDuplicateDeduplicationKey(exception))
+            {
+                // Một request đồng thời đã tạo cùng message; message đó sẽ được worker xử lý.
+                DetachPendingOutboxEntries();
+            }
+            return await HasPendingCandidateRefreshAsync(candidateId, cancellationToken);
+        }
+
+        private Task<bool> HasPendingCandidateRefreshAsync(Guid candidateId, CancellationToken cancellationToken)
+            => _context.OutboxMessages.AnyAsync(message =>
+                message.DeduplicationKey != null &&
+                (message.DeduplicationKey == $"matching:candidate:{candidateId:D}" ||
+                 message.DeduplicationKey.StartsWith($"matching:candidate:{candidateId:D}:")) &&
+                message.ProcessedAt == null && message.DeadLetteredAt == null,
+                cancellationToken);
+
+        private async Task<string?> GetJobRankingRefreshKeyAsync(Guid jobPostId, CancellationToken cancellationToken)
+        {
+            var key = $"matching:job:{jobPostId:D}";
+            var lastCompletedRefresh = await _context.OutboxMessages
+                .AsNoTracking()
+                .Where(message => message.Type == "matching.job.refresh" &&
+                                  message.DeduplicationKey != null &&
+                                  (message.DeduplicationKey == key ||
+                                   message.DeduplicationKey.StartsWith(key + ":")) &&
+                                  message.ProcessedAt != null)
+                .MaxAsync(message => (DateTime?)message.ProcessedAt, cancellationToken);
+            var newestApplication = await _context.Jobs
+                .AsNoTracking()
+                .Where(application => application.JobPostId == jobPostId)
+                .OrderByDescending(application => application.AppliedAt)
+                .ThenByDescending(application => application.Id)
+                .Select(application => new { application.AppliedAt, application.Id })
+                .FirstOrDefaultAsync(cancellationToken);
+
+            if (newestApplication == null)
+                return lastCompletedRefresh.HasValue ? null : key;
+            if (!lastCompletedRefresh.HasValue || newestApplication.AppliedAt > lastCompletedRefresh.Value)
+                return $"{key}:applications:{newestApplication.AppliedAt.Ticks}:{newestApplication.Id:D}";
+            return null;
+        }
+
+        private async Task<bool> QueueJobRankingRefreshIfNeededAsync(
+            Guid jobPostId,
+            string key,
+            CancellationToken cancellationToken)
+        {
+            var existing = await _context.OutboxMessages
+                .AsNoTracking()
+                .Where(message => message.DeduplicationKey == key)
+                .Select(message => new { message.ProcessedAt, message.DeadLetteredAt })
+                .SingleOrDefaultAsync(cancellationToken);
+            if (existing != null)
+                return existing.ProcessedAt == null && existing.DeadLetteredAt == null;
+
+            _outbox.Add("matching.job.refresh", new { JobPostId = jobPostId }, key);
+            try
+            {
+                await _context.SaveChangesAsync(cancellationToken);
+            }
+            catch (DbUpdateException exception) when (IsDuplicateDeduplicationKey(exception))
+            {
+                DetachPendingOutboxEntries();
+            }
+            return await HasPendingJobRefreshAsync(jobPostId, cancellationToken);
+        }
+
+        private void DetachPendingOutboxEntries()
+        {
+            foreach (var entry in _context.ChangeTracker.Entries<OutboxMessage>()
+                         .Where(entry => entry.State == EntityState.Added))
+                entry.State = EntityState.Detached;
+        }
+
+        private static bool IsDuplicateDeduplicationKey(DbUpdateException exception)
+        {
+            var message = exception.ToString();
+            return message.Contains("DeduplicationKey", StringComparison.OrdinalIgnoreCase) ||
+                message.Contains("UNIQUE", StringComparison.OrdinalIgnoreCase) ||
+                message.Contains("duplicate", StringComparison.OrdinalIgnoreCase);
+        }
+
+        private Task<bool> HasPendingJobRefreshAsync(Guid jobPostId, CancellationToken cancellationToken)
+            => _context.OutboxMessages.AnyAsync(message =>
+                message.DeduplicationKey != null &&
+                (message.DeduplicationKey == $"matching:job:{jobPostId:D}" ||
+                 message.DeduplicationKey.StartsWith($"matching:job:{jobPostId:D}:")) &&
+                message.ProcessedAt == null && message.DeadLetteredAt == null,
+                cancellationToken);
+
+        private static MatchResultDto ToDto(MatchResult result) => new()
+        {
+            JobPostId = result.JobPostId,
+            CandidateId = result.CandidateId,
+            TotalScore = result.TotalScore,
+            AlgorithmVersion = result.AlgorithmVersion,
+            Breakdown = JsonSerializer.Deserialize<MatchBreakdownDto>(result.BreakdownJson) ?? new MatchBreakdownDto(),
+            MatchedSkills = JsonSerializer.Deserialize<List<string>>(result.MatchedSkillsJson) ?? new List<string>(),
+            MissingSkills = JsonSerializer.Deserialize<List<string>>(result.MissingSkillsJson) ?? new List<string>(),
+            Reason = JsonSerializer.Deserialize<List<string>>(result.ReasonsJson)?.FirstOrDefault() ?? string.Empty,
+            InputFingerprint = result.InputFingerprint,
+            JobPost = result.JobPost == null ? null : new MatchJobSummaryDto
+            {
+                Id = result.JobPost.Id,
+                Title = result.JobPost.Title,
+                Location = result.JobPost.Location,
+                Salary = result.JobPost.Salary,
+                Type = result.JobPost.Type,
+                ExpiresAt = result.JobPost.ExpiresAt
+            },
+            Candidate = result.Candidate == null ? null : new MatchCandidateSummaryDto
+            {
+                Id = result.Candidate.Id,
+                FullName = result.Candidate.FullName,
+                Email = result.Candidate.Email
+            }
+        };
 
         private static PagedMatchesDto Page(List<MatchResultDto> matches, MatchQueryDto query)
         {

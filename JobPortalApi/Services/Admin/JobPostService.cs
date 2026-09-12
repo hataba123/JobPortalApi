@@ -12,7 +12,13 @@ namespace JobPortalApi.Services.Admin
     public class JobPostService : IJobPostService
     {
         private readonly ApplicationDbContext _context;
-        public JobPostService(ApplicationDbContext context) => _context = context;
+        private readonly IOutboxService _outbox;
+
+        public JobPostService(ApplicationDbContext context, IOutboxService outbox)
+        {
+            _context = context;
+            _outbox = outbox;
+        }
 
         public async Task<List<JobPostDto>> GetAllJobPostsAsync()
         {
@@ -72,6 +78,7 @@ namespace JobPortalApi.Services.Admin
         {
             var j = new JobPost
             {
+                Id = Guid.NewGuid(),
                 Title = dto.Title,
                 Description = dto.Description,
                 SkillsRequired = dto.SkillsRequired,
@@ -89,6 +96,13 @@ namespace JobPortalApi.Services.Admin
                 CategoryId = dto.CategoryId
             };
             _context.JobPosts.Add(j);
+            if (j.Status == JobPostStatus.Active)
+            {
+                _outbox.Add(
+                    "matching.job.refresh",
+                    new { JobPostId = j.Id },
+                    $"matching:job:{j.Id:D}:changed:{Guid.NewGuid():D}");
+            }
             await _context.SaveChangesAsync();
             return await GetJobPostByIdAsync(j.Id)!;
         }
@@ -114,6 +128,13 @@ namespace JobPortalApi.Services.Admin
             if (dto.ExpiresAt.HasValue) j.ExpiresAt = dto.ExpiresAt.Value;
             if (dto.Status.HasValue) j.Status = dto.Status.Value;
             if (dto.CategoryId.HasValue) j.CategoryId = dto.CategoryId.Value;
+            if (j.Status == JobPostStatus.Active)
+            {
+                _outbox.Add(
+                    "matching.job.refresh",
+                    new { JobPostId = j.Id },
+                    $"matching:job:{j.Id:D}:changed:{Guid.NewGuid():D}");
+            }
             _context.JobPosts.Update(j);
             try { await _context.SaveChangesAsync(); }
             catch (DbUpdateConcurrencyException)
