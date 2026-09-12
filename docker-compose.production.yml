@@ -1,0 +1,122 @@
+services:
+  sqlserver:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    restart: unless-stopped
+    environment:
+      ACCEPT_EULA: "Y"
+      MSSQL_PID: ${MSSQL_PID:-Standard}
+      MSSQL_SA_PASSWORD: ${MSSQL_SA_PASSWORD:?Set MSSQL_SA_PASSWORD}
+    volumes:
+      - sqlserver-data:/var/opt/mssql
+    networks: [internal]
+
+  redis:
+    image: redis:7.4-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes", "--save", "60", "1", "--requirepass", "${REDIS_PASSWORD:?Set REDIS_PASSWORD}"]
+    expose: ["6379"]
+    volumes:
+      - redis-data:/data
+    networks: [internal]
+
+  clamav:
+    image: clamav/clamav:1.4
+    restart: unless-stopped
+    expose: ["3310"]
+    volumes:
+      - clamav-data:/var/lib/clamav
+    networks: [internal]
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    expose: ["8080"]
+    environment: &api_environment
+      ASPNETCORE_ENVIRONMENT: Production
+      ConnectionStrings__DefaultConnection: ${APP_DB_CONNECTION:?Set APP_DB_CONNECTION for the least-privilege application login}
+      Jwt__Key: ${JWT_KEY:?Set JWT_KEY}
+      Jwt__Issuer: ${JWT_ISSUER:?Set JWT_ISSUER}
+      Jwt__Audience: ${JWT_AUDIENCE:?Set JWT_AUDIENCE}
+      OAuth__ExchangeSecret: ${OAUTH_EXCHANGE_SECRET:?Set OAUTH_EXCHANGE_SECRET}
+      DataProtection__KeyRingPath: /app/data-protection-keys
+      Cors__AllowedOrigins__0: ${APP_ORIGIN:?Set APP_ORIGIN}
+      ReverseProxy__KnownNetworks__0: 172.30.0.0/16
+      Redis__ConnectionString: redis:6379,password=${REDIS_PASSWORD:?Set REDIS_PASSWORD},abortConnect=false
+      BackgroundJobs__Enabled: "false"
+      Vnpay__TmnCode: ${VNPAY_TMN_CODE:?Set VNPAY_TMN_CODE}
+      Vnpay__HashSecret: ${VNPAY_HASH_SECRET:?Set VNPAY_HASH_SECRET}
+      Vnpay__PaymentUrl: ${VNPAY_PAYMENT_URL:?Set VNPAY_PAYMENT_URL}
+      Vnpay__ReturnUrl: ${VNPAY_RETURN_URL:?Set VNPAY_RETURN_URL}
+      Email__WebhookUrl: ${EMAIL_WEBHOOK_URL:?Set EMAIL_WEBHOOK_URL}
+      Email__WebhookSecret: ${EMAIL_WEBHOOK_SECRET:?Set EMAIL_WEBHOOK_SECRET}
+      ClamAv__Enabled: "true"
+      ClamAv__Host: clamav
+      ClamAv__Port: "3310"
+    volumes:
+      - private-cv-data:/app/private-data/cv
+      - public-media-data:/app/wwwroot/uploads
+      - data-protection-keys:/app/data-protection-keys
+    depends_on: [sqlserver, redis, clamav]
+    networks: [internal]
+
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    environment:
+      <<: *api_environment
+      BackgroundJobs__Enabled: "true"
+    volumes:
+      - private-cv-data:/app/private-data/cv
+      - public-media-data:/app/wwwroot/uploads
+      - data-protection-keys:/app/data-protection-keys
+    depends_on: [sqlserver, redis, clamav]
+    networks: [internal]
+
+  frontend:
+    build:
+      context: ../jobportal-fe
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    expose: ["3000"]
+    environment:
+      NODE_ENV: production
+      APP_ORIGIN: ${APP_ORIGIN:?Set APP_ORIGIN}
+      BACKEND_API_URL: http://api:8080/api
+      NEXTAUTH_URL: ${APP_ORIGIN:?Set APP_ORIGIN}
+      NEXTAUTH_SECRET: ${NEXTAUTH_SECRET:?Set NEXTAUTH_SECRET}
+      OAUTH_EXCHANGE_SECRET: ${OAUTH_EXCHANGE_SECRET:?Set OAUTH_EXCHANGE_SECRET}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:?Set GOOGLE_CLIENT_ID}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:?Set GOOGLE_CLIENT_SECRET}
+      GITHUB_CLIENT_ID: ${GITHUB_CLIENT_ID:?Set GITHUB_CLIENT_ID}
+      GITHUB_CLIENT_SECRET: ${GITHUB_CLIENT_SECRET:?Set GITHUB_CLIENT_SECRET}
+    networks: [internal]
+
+  nginx:
+    image: nginx:1.27-alpine
+    restart: unless-stopped
+    ports: ["80:80", "443:443"]
+    volumes:
+      - ./ops/nginx/production.conf:/etc/nginx/conf.d/default.conf:ro
+      - ${TLS_CERTIFICATE_PATH:?Set TLS_CERTIFICATE_PATH}:/etc/nginx/tls/fullchain.pem:ro
+      - ${TLS_KEY_PATH:?Set TLS_KEY_PATH}:/etc/nginx/tls/privkey.pem:ro
+    depends_on: [api, frontend]
+    networks: [internal]
+
+networks:
+  internal:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.30.0.0/16
+
+volumes:
+  sqlserver-data:
+  private-cv-data:
+  public-media-data:
+  data-protection-keys:
+  redis-data:
+  clamav-data:

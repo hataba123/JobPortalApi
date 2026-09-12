@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
+using StackExchange.Redis;
 
 namespace JobPortalApi.Controllers;
 
@@ -10,8 +11,13 @@ namespace JobPortalApi.Controllers;
 public class HealthController : ControllerBase
 {
     private readonly ApplicationDbContext _context;
+    private readonly IConnectionMultiplexer? _redis;
 
-    public HealthController(ApplicationDbContext context) => _context = context;
+    public HealthController(ApplicationDbContext context, IServiceProvider services)
+    {
+        _context = context;
+        _redis = services.GetService<IConnectionMultiplexer>();
+    }
 
     [HttpGet("health")]
     [ProducesResponseType(StatusCodes.Status200OK)]
@@ -34,6 +40,8 @@ public class HealthController : ControllerBase
                     status = "unavailable",
                     timestamp = DateTimeOffset.UtcNow
                 });
+            if (_redis != null)
+                await _redis.GetDatabase().PingAsync();
         }
         catch (Exception)
         {

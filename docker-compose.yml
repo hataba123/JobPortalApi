@@ -31,7 +31,8 @@ services:
       OAuth__ExchangeSecret: ${OAUTH_EXCHANGE_SECRET:?Set OAUTH_EXCHANGE_SECRET in the environment}
       Vnpay__TmnCode: ${VNPAY_TMN_CODE:?Set VNPAY_TMN_CODE in the environment}
       Vnpay__HashSecret: ${VNPAY_HASH_SECRET:?Set VNPAY_HASH_SECRET in the environment}
-      Vnpay__ReturnUrl: ${VNPAY_RETURN_URL:-http://localhost:3000/vi/payment/return}
+      Vnpay__PaymentUrl: ${VNPAY_PAYMENT_URL:?Set VNPAY_PAYMENT_URL in the environment}
+      Vnpay__ReturnUrl: ${VNPAY_RETURN_URL:?Set VNPAY_RETURN_URL in the environment}
     depends_on:
       sqlserver:
         condition: service_healthy
@@ -45,9 +46,13 @@ services:
     environment:
       NODE_ENV: production
       BACKEND_API_URL: http://aspnet-api:8080/api
-      NEXTAUTH_URL: ${NEXTAUTH_URL:-http://localhost:3000}
+      NEXTAUTH_URL: ${NEXTAUTH_URL:?Set NEXTAUTH_URL in the environment}
       NEXTAUTH_SECRET: ${NEXTAUTH_SECRET:?Set NEXTAUTH_SECRET in the environment}
       OAUTH_EXCHANGE_SECRET: ${OAUTH_EXCHANGE_SECRET:?Set OAUTH_EXCHANGE_SECRET in the environment}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:?Set GOOGLE_CLIENT_ID in the environment}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:?Set GOOGLE_CLIENT_SECRET in the environment}
+      GITHUB_CLIENT_ID: ${GITHUB_CLIENT_ID:?Set GITHUB_CLIENT_ID in the environment}
+      GITHUB_CLIENT_SECRET: ${GITHUB_CLIENT_SECRET:?Set GITHUB_CLIENT_SECRET in the environment}
     depends_on:
       aspnet-api:
         condition: service_started
