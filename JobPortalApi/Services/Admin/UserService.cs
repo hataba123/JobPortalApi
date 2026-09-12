@@ -1,6 +1,5 @@
 ﻿using JobPortalApi.DTOs.AdminUser;
 using JobPortalApi.Services.Interface;
-using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using JobPortalApi.Models;
 using JobPortalApi.DTOs.shared;
@@ -11,12 +10,9 @@ namespace JobPortalApi.Services.Admin
     public class UserService : IUserService
     {
         private readonly ApplicationDbContext _context;
-        private readonly IPasswordHasher<Models.User> _passwordHasher;
-
-        public UserService(ApplicationDbContext context, IPasswordHasher<Models.User> passwordHasher)
+        public UserService(ApplicationDbContext context)
         {
             _context = context;
-            _passwordHasher = passwordHasher;
         }
 
         public async Task<List<UserDto>> GetAllUsersAsync()
@@ -86,7 +82,8 @@ namespace JobPortalApi.Services.Admin
                 FullName = dto.FullName,
                 Role = dto.Role
             };
-            user.PasswordHash = _passwordHasher.HashPassword(user, dto.Password);
+            // Tài khoản mới dùng cùng định dạng BCrypt với luồng đăng nhập.
+            user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(dto.Password);
             _context.Users.Add(user);
             await _context.SaveChangesAsync();
             return new UserDto
@@ -104,7 +101,12 @@ namespace JobPortalApi.Services.Admin
             if (user == null) return false;
             if (!string.IsNullOrWhiteSpace(dto.Email)) user.Email = dto.Email;
             if (!string.IsNullOrWhiteSpace(dto.FullName)) user.FullName = dto.FullName;
-            if (dto.Role.HasValue) user.Role = dto.Role.Value;
+            if (dto.Role.HasValue && user.Role != dto.Role.Value)
+            {
+                user.Role = dto.Role.Value;
+                // JWT đang mang role cũ sẽ bị từ chối từ request kế tiếp.
+                user.PasswordVersion++;
+            }
             _context.Users.Update(user);
             await _context.SaveChangesAsync();
             return true;

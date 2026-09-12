@@ -15,7 +15,7 @@ jobs:
         with:
           dotnet-version: 8.0.x
       - run: dotnet restore JobPortalApi.sln
-      - run: dotnet build JobPortalApi.sln --no-restore --configuration Release --warnaserror false
+      - run: dotnet build JobPortalApi.sln --no-restore --configuration Release
       - run: dotnet test JobPortalApi.sln --no-build --configuration Release
       - name: Vulnerable package report
         run: dotnet list JobPortalApi/JobPortalApi.csproj package --vulnerable --include-transitive

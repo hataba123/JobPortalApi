@@ -109,6 +109,7 @@ public sealed class AuthApiFactory : WebApplicationFactory<Program>
         // WebApplication.CreateBuilder reads these values before ConfigureTestServices runs.
         Environment.SetEnvironmentVariable("Jwt__Key", "integration-test-signing-key-that-is-long-enough");
         Environment.SetEnvironmentVariable("Jwt__Issuer", "JobPortalAPI");
+        Environment.SetEnvironmentVariable("Jwt__Audience", "JobPortalClient");
         Environment.SetEnvironmentVariable("BackgroundJobs__Enabled", "false");
         Environment.SetEnvironmentVariable(
             "ConnectionStrings__DefaultConnection",
@@ -124,6 +125,7 @@ public sealed class AuthApiFactory : WebApplicationFactory<Program>
             {
                 ["Jwt:Key"] = "integration-test-signing-key-that-is-long-enough",
                 ["Jwt:Issuer"] = "JobPortalAPI",
+                ["Jwt:Audience"] = "JobPortalClient",
                 ["BackgroundJobs:Enabled"] = "false",
                 ["ConnectionStrings:DefaultConnection"] = "Server=(local);Database=JobPortalIntegration;Trusted_Connection=True;"
             });

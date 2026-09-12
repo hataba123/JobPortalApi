@@ -11,6 +11,8 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.FileProviders;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
+using Microsoft.AspNetCore.DataProtection;
+using Microsoft.AspNetCore.HttpOverrides;
 using System.Security.Claims;
 using System.Text;
 using System.Diagnostics;
@@ -22,13 +24,36 @@ using JobPortalApi.Services.Notifications;
 using JobPortalApi.Services.Infrastructure;
 using JobPortalApi.Middleware;
 using JobPortalApi.Services.Media;
+using StackExchange.Redis;
 
 var builder = WebApplication.CreateBuilder(args);
+builder.WebHost.ConfigureKestrel(options =>
+{
+    // Giới hạn mặc định cho mọi request, kể cả khi request đi thẳng vào API
+    // thay vì qua BFF/Nginx.
+    options.Limits.MaxRequestBodySize = 10 * 1024 * 1024;
+});
 var jwtKey = builder.Configuration["Jwt:Key"];
 var jwtIssuer = builder.Configuration["Jwt:Issuer"];
 var jwtAudience = builder.Configuration["Jwt:Audience"];
-if (string.IsNullOrWhiteSpace(jwtKey) || string.IsNullOrWhiteSpace(jwtIssuer))
-    throw new InvalidOperationException("Jwt:Key và Jwt:Issuer là bắt buộc.");
+if (string.IsNullOrWhiteSpace(jwtKey) || jwtKey.Length < 32 ||
+    string.IsNullOrWhiteSpace(jwtIssuer) || string.IsNullOrWhiteSpace(jwtAudience))
+    throw new InvalidOperationException("Jwt:Key tối thiểu 32 ký tự, Jwt:Issuer và Jwt:Audience là bắt buộc.");
+
+var backgroundJobsEnabled = builder.Configuration.GetValue("BackgroundJobs:Enabled", true);
+var emailWebhookUrl = builder.Configuration["Email:WebhookUrl"]
+    ?? Environment.GetEnvironmentVariable("EMAIL_WEBHOOK_URL");
+if (builder.Environment.IsProduction() && backgroundJobsEnabled && string.IsNullOrWhiteSpace(emailWebhookUrl))
+    throw new InvalidOperationException("Email:WebhookUrl là bắt buộc khi worker production được bật.");
+
+var dataProtection = builder.Services.AddDataProtection()
+    .SetApplicationName("JobPortalApi");
+var dataProtectionKeyPath = builder.Configuration["DataProtection:KeyRingPath"];
+if (!string.IsNullOrWhiteSpace(dataProtectionKeyPath))
+{
+    Directory.CreateDirectory(dataProtectionKeyPath);
+    dataProtection.PersistKeysToFileSystem(new DirectoryInfo(dataProtectionKeyPath));
+}
 
 // Add services to the container.
 // Admin services
@@ -73,7 +98,20 @@ builder.Services.AddScoped<MatchingService>();
 builder.Services.AddScoped<PaymentService>();
 builder.Services.AddScoped<CreditLedgerService>();
 builder.Services.AddScoped<PublicMediaService>();
+builder.Services.AddSingleton<IClamAvScanner, ClamAvScanner>();
 builder.Services.AddHostedService<BackgroundProcessingService>();
+var redisConnectionString = builder.Configuration["Redis:ConnectionString"];
+if (!string.IsNullOrWhiteSpace(redisConnectionString))
+{
+    builder.Services.AddSingleton<IConnectionMultiplexer>(_ =>
+    {
+        var redisOptions = ConfigurationOptions.Parse(redisConnectionString);
+        redisOptions.AbortOnConnectFail = false;
+        redisOptions.ConnectTimeout = 1000;
+        redisOptions.SyncTimeout = 1000;
+        return ConnectionMultiplexer.Connect(redisOptions);
+    });
+}
 // add db context
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection"),
@@ -93,13 +131,15 @@ builder.Services.AddSwaggerGen(options =>
 // Bật và cấu hình CORS
 builder.Services.AddCors(options =>
 {
+    var allowedOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>()
+        ?? ["http://localhost:3000", "http://localhost:3001", "http://localhost:3002"];
     options.AddPolicy("AllowFrontends",
-        builder =>
+        corsBuilder =>
         {
-            builder.WithOrigins("http://localhost:3000", "http://localhost:3001", "http://localhost:3002") // Port của Next.js
-                   .AllowAnyHeader()
-                   .AllowAnyMethod()
-                   .AllowCredentials();
+            corsBuilder.WithOrigins(allowedOrigins)
+                .AllowAnyHeader()
+                .AllowAnyMethod()
+                .AllowCredentials();
         });
 });
 
@@ -111,10 +151,11 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             {
                 // Config xác thực JWT
                 ValidateIssuer = true,
-                ValidateAudience = false,
+                ValidateAudience = true,
                 ValidateLifetime = true,
                 ValidateIssuerSigningKey = true,
                 ValidIssuer = jwtIssuer,
+                ValidAudience = jwtAudience,
                 IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey)),
                 // 🔥 Quan trọng: map đúng claim role
                 RoleClaimType = "http://schemas.microsoft.com/ws/2008/06/identity/claims/role",
@@ -125,8 +166,6 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
                 {
                     var userIdValue = context.Principal?.FindFirstValue(ClaimTypes.NameIdentifier);
                     var versionValue = context.Principal?.FindFirst("pwd_ver")?.Value;
-                    // Token phát hành trước migration không có version; cho phép đến khi hết hạn.
-                    if (versionValue == null) return;
                     if (!Guid.TryParse(userIdValue, out var userId) ||
                         !int.TryParse(versionValue, out var tokenVersion))
                     {
@@ -225,6 +264,32 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
 
 var app = builder.Build();
 
+var knownProxyAddresses = builder.Configuration.GetSection("ReverseProxy:KnownProxies").Get<string[]>() ?? [];
+var knownProxyNetworks = builder.Configuration.GetSection("ReverseProxy:KnownNetworks").Get<string[]>() ?? [];
+if (knownProxyAddresses.Length > 0 || knownProxyNetworks.Length > 0)
+{
+    var forwardedHeaders = new ForwardedHeadersOptions
+    {
+        ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto,
+        ForwardLimit = 2
+    };
+    foreach (var address in knownProxyAddresses)
+        if (System.Net.IPAddress.TryParse(address, out var parsedAddress))
+            forwardedHeaders.KnownProxies.Add(parsedAddress);
+    foreach (var network in knownProxyNetworks)
+    {
+        var parts = network.Split('/', 2, StringSplitOptions.TrimEntries);
+        if (parts.Length == 2 &&
+            System.Net.IPAddress.TryParse(parts[0], out var prefix) &&
+            int.TryParse(parts[1], out var prefixLength) &&
+            prefixLength >= 0 && prefixLength <= (prefix.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork ? 32 : 128))
+        {
+            forwardedHeaders.KnownNetworks.Add(new IPNetwork(prefix, prefixLength));
+        }
+    }
+    app.UseForwardedHeaders(forwardedHeaders);
+}
+
 if (builder.Configuration.GetValue<bool>("Seed:Enabled") ||
     string.Equals(Environment.GetEnvironmentVariable("SEED_DATABASE"), "true", StringComparison.OrdinalIgnoreCase))
 {
@@ -284,12 +349,25 @@ if (app.Environment.IsDevelopment())
     app.UseStaticFiles(new StaticFileOptions
     {
         FileProvider = new PhysicalFileProvider(webRoot),
-        RequestPath = ""
+        RequestPath = "",
+        OnPrepareResponse = static context =>
+        {
+            var physicalPath = context.File.PhysicalPath;
+            if (!string.IsNullOrWhiteSpace(physicalPath) &&
+                string.Equals(Path.GetExtension(physicalPath), ".svg", StringComparison.OrdinalIgnoreCase))
+            {
+                // SVG cũ có thể vẫn còn trong volume. Vô hiệu hóa script và
+                // tài nguyên ngoài trong lúc chưa chuyển sang media domain riêng.
+                context.Context.Response.Headers["Content-Security-Policy"] = "default-src 'none'; sandbox";
+                context.Context.Response.Headers["Content-Disposition"] = "attachment";
+            }
+        }
     });
     app.UseCors("AllowFrontends"); // phải gọi trước UseAuthorization() 
     app.UseHttpsRedirection();
-    app.UseRateLimiter();
     app.UseAuthentication(); // 🛡 Bắt buộc đặt trước UseAuthorization
+    app.UseMiddleware<RedisRateLimitMiddleware>();
+    app.UseRateLimiter();
 
     app.UseAuthorization();
 

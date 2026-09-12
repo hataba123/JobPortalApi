@@ -25,8 +25,6 @@ public class PublicMediaService
         var extension = DetectExtension(contentType, content);
         if (extension == null)
             throw new ArgumentException("Ảnh không đúng định dạng hoặc chữ ký file.");
-        if (extension == ".svg" && !IsSafeSvg(content))
-            throw new ArgumentException("SVG chứa nội dung không an toàn.");
 
         var root = Path.GetFullPath(Path.Combine(
             _environment.WebRootPath ?? Path.Combine(_environment.ContentRootPath, "wwwroot"),
@@ -49,19 +47,6 @@ public class PublicMediaService
         if ((contentType == "image/jpeg" || contentType == "image/jpg") && content.Length >= 3 &&
             content.AsSpan(0, 3).SequenceEqual(new byte[] { 255, 216, 255 }))
             return ".jpg";
-        if (contentType == "image/svg+xml" && System.Text.RegularExpressions.Regex.IsMatch(
-                System.Text.Encoding.UTF8.GetString(content, 0, Math.Min(content.Length, 512)),
-                @"^\s*<svg(?:\s|>)", System.Text.RegularExpressions.RegexOptions.IgnoreCase))
-            return ".svg";
         return null;
-    }
-
-    private static bool IsSafeSvg(byte[] content)
-    {
-        var text = System.Text.Encoding.UTF8.GetString(content);
-        return !System.Text.RegularExpressions.Regex.IsMatch(
-            text,
-            @"<script|on[a-z]+\s*=|(?:xlink:)?href\s*=\s*[""']https?:",
-            System.Text.RegularExpressions.RegexOptions.IgnoreCase);
     }
 }

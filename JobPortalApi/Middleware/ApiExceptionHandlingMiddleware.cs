@@ -43,7 +43,10 @@ namespace JobPortalApi.Middleware
             if (statusCode >= 500)
                 _logger.LogError(exception, "Unhandled API exception {TraceId}", context.TraceIdentifier);
             else
-                _logger.LogWarning(exception, "Handled API exception {TraceId}", context.TraceIdentifier);
+                // Không ghi nguyên exception của request vào log; một số lỗi xác thực
+                // hoặc thanh toán có thể chứa token, email hay dữ liệu đối tác.
+                _logger.LogWarning("Handled API exception {TraceId} {ExceptionType}",
+                    context.TraceIdentifier, exception.GetType().Name);
 
             if (context.Response.HasStarted) return;
             context.Response.StatusCode = statusCode;

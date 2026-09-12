@@ -11,6 +11,9 @@ using JobPortalApi.DTOs.Shared;
 using System.Security.Cryptography;
 using JobPortalApi.Services.Notifications;
 using JobPortalApi.Middleware;
+using JobPortalApi.Services.Infrastructure;
+using Microsoft.AspNetCore.DataProtection;
+using Microsoft.AspNetCore.Identity;
 
 namespace JobPortalApi.Services.User
 {
@@ -20,19 +23,25 @@ namespace JobPortalApi.Services.User
         private readonly SecureJwtHelper _jwtHelper;
         private readonly IConfiguration _configuration;
         private readonly OAuthProviderVerifier _oauthProviderVerifier;
-        private readonly EmailNotificationService? _emailNotificationService;
+        private readonly IPasswordHasher<Models.User> _legacyPasswordHasher;
+        private readonly IOutboxService _outbox;
+        private readonly IDataProtector _passwordResetProtector;
 
         public AuthService(
             ApplicationDbContext context,
             IConfiguration configuration,
             OAuthProviderVerifier oauthProviderVerifier,
-            EmailNotificationService? emailNotificationService = null)
+            IPasswordHasher<Models.User> legacyPasswordHasher,
+            IOutboxService outbox,
+            IDataProtectionProvider dataProtectionProvider)
         {
             _context = context;
             _configuration = configuration;
             _jwtHelper = new SecureJwtHelper(configuration);
             _oauthProviderVerifier = oauthProviderVerifier;
-            _emailNotificationService = emailNotificationService;
+            _legacyPasswordHasher = legacyPasswordHasher;
+            _outbox = outbox;
+            _passwordResetProtector = dataProtectionProvider.CreateProtector("JobPortalApi.PasswordReset.v1");
         }
 
         // Đăng ký người dùng mới
@@ -103,7 +112,7 @@ namespace JobPortalApi.Services.User
             if (user.LockoutUntil > now)
                 throw new InvalidOperationException("Email hoặc mật khẩu không đúng.");
 
-            if (!VerifyPassword(request.Password, user.PasswordHash))
+            if (!VerifyPassword(request.Password, user, out var usedLegacyPasswordHash))
             {
                 user.FailedLoginAttempts++;
                 var maxAttempts = GetPositiveSetting("AUTH_MAX_FAILED_LOGIN_ATTEMPTS", "Auth:MaxFailedLoginAttempts", 5);
@@ -116,7 +125,10 @@ namespace JobPortalApi.Services.User
                 throw new InvalidOperationException("Email hoặc mật khẩu không đúng.");
             }
 
-            if (user.FailedLoginAttempts != 0 || user.LockoutUntil.HasValue)
+            if (usedLegacyPasswordHash)
+                user.PasswordHash = HashPassword(request.Password);
+
+            if (usedLegacyPasswordHash || user.FailedLoginAttempts != 0 || user.LockoutUntil.HasValue)
             {
                 user.FailedLoginAttempts = 0;
                 user.LockoutUntil = null;
@@ -199,7 +211,7 @@ namespace JobPortalApi.Services.User
         {
             var user = await _context.Users.FindAsync(userId);
             if (user == null) throw new UnauthorizedAccessException("Tài khoản không tồn tại.");
-            if (!VerifyPassword(request.CurrentPassword, user.PasswordHash))
+            if (!VerifyPassword(request.CurrentPassword, user, out _))
                 throw new InvalidOperationException("Mật khẩu hiện tại không đúng.");
 
             user.PasswordHash = HashPassword(request.NewPassword);
@@ -226,10 +238,14 @@ namespace JobPortalApi.Services.User
                 TokenHash = HashResetToken(rawToken),
                 ExpiresAt = now.AddMinutes(15)
             });
+            // Token thô chỉ nằm trong payload được Data Protection mã hóa. Database
+            // vẫn chỉ lưu hash token để kiểm tra hạn và vô hiệu hóa token đã dùng.
+            _outbox.Add("password.reset.requested", new
+            {
+                Email = user.Email,
+                ProtectedToken = _passwordResetProtector.Protect(rawToken)
+            }, $"password-reset:{user.Id:D}:{HashResetToken(rawToken)}");
             await _context.SaveChangesAsync();
-            // Chỉ gửi token qua provider; token thô không được lưu hoặc trả về API.
-            if (_emailNotificationService != null)
-                await _emailNotificationService.SendPasswordResetAsync(user.Email, rawToken);
         }
 
         public async Task ResetPasswordAsync(ResetPasswordRequest request)
@@ -262,10 +278,19 @@ namespace JobPortalApi.Services.User
             return BCrypt.Net.BCrypt.HashPassword(password);
         }
 
-        // So sánh mật khẩu nhập với mật khẩu đã hash
-        private bool VerifyPassword(string inputPassword, string hashedPassword)
+        // Hỗ trợ một lần cho tài khoản lịch sử được tạo bằng ASP.NET Identity,
+        // sau lần đăng nhập thành công hash được thay bằng BCrypt.
+        private bool VerifyPassword(string inputPassword, Models.User user, out bool usedLegacyPasswordHash)
         {
-            return BCrypt.Net.BCrypt.Verify(inputPassword, hashedPassword);
+            usedLegacyPasswordHash = false;
+            if (string.IsNullOrWhiteSpace(user.PasswordHash)) return false;
+
+            if (user.PasswordHash.StartsWith("$2", StringComparison.Ordinal))
+                return BCrypt.Net.BCrypt.Verify(inputPassword, user.PasswordHash);
+
+            var result = _legacyPasswordHasher.VerifyHashedPassword(user, user.PasswordHash, inputPassword);
+            usedLegacyPasswordHash = result is PasswordVerificationResult.Success or PasswordVerificationResult.SuccessRehashNeeded;
+            return usedLegacyPasswordHash;
         }
 
         private static string HashResetToken(string token)

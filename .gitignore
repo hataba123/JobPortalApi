@@ -10,3 +10,7 @@ wwwroot/uploads/
 **/uploads/cv/
 data/cv/
 backups/
+.env
+.env.*
+!.env.example
+!.env.production.example

@@ -433,8 +433,7 @@ public class PaymentService
         var signature = SignVnpay(parameters, GetRequiredSetting("VNPAY_HASH_SECRET", "Vnpay:HashSecret"));
         var query = string.Join("&", parameters.OrderBy(item => item.Key, StringComparer.Ordinal)
             .Select(item => $"{Encode(item.Key)}={Encode(item.Value)}"));
-        var paymentUrl = GetSetting("VNPAY_PAYMENT_URL", "Vnpay:PaymentUrl")
-            ?? "https://sandbox.vnpayment.vn/paymentv2/vpcpay.html";
+        var paymentUrl = GetRequiredSetting("VNPAY_PAYMENT_URL", "Vnpay:PaymentUrl");
         return $"{paymentUrl}?{query}&vnp_SecureHash={signature}";
     }
 
