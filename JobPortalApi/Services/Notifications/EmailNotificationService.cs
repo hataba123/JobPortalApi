@@ -18,47 +18,47 @@ namespace JobPortalApi.Services.Notifications
             _logger = logger;
         }
 
-        public Task SendApplicationConfirmationAsync(string to, string jobTitle, bool throwOnFailure = false) => SendAsync(
+        public Task SendApplicationConfirmationAsync(string to, string jobTitle, bool throwOnFailure = false, string? idempotencyKey = null) => SendAsync(
             to,
             $"Đã nhận hồ sơ ứng tuyển: {jobTitle}",
-            $"Hồ sơ của bạn cho tin \"{jobTitle}\" đã được hệ thống tiếp nhận.", throwOnFailure);
+            $"Hồ sơ của bạn cho tin \"{jobTitle}\" đã được hệ thống tiếp nhận.", throwOnFailure, idempotencyKey);
 
-        public Task SendApplicationStatusChangedAsync(string to, string jobTitle, string status, bool throwOnFailure = false) => SendAsync(
+        public Task SendApplicationStatusChangedAsync(string to, string jobTitle, string status, bool throwOnFailure = false, string? idempotencyKey = null) => SendAsync(
             to,
             $"Cập nhật hồ sơ ứng tuyển: {jobTitle}",
-            $"Trạng thái hồ sơ cho tin \"{jobTitle}\" đã chuyển thành {status}.", throwOnFailure);
+            $"Trạng thái hồ sơ cho tin \"{jobTitle}\" đã chuyển thành {status}.", throwOnFailure, idempotencyKey);
 
-        public Task SendInterviewInvitationAsync(string to, string jobTitle, DateTime startAt, string? meetingUrl, string? location, bool throwOnFailure = false) => SendAsync(
+        public Task SendInterviewInvitationAsync(string to, string jobTitle, DateTime startAt, string? meetingUrl, string? location, bool throwOnFailure = false, string? idempotencyKey = null) => SendAsync(
             to,
             $"Lời mời phỏng vấn: {jobTitle}",
             $"Bạn có lịch phỏng vấn cho vị trí \"{jobTitle}\" lúc {startAt:u}. " +
-            (!string.IsNullOrWhiteSpace(meetingUrl) ? $"Link: {meetingUrl}" : $"Địa điểm: {location}"), throwOnFailure);
+            (!string.IsNullOrWhiteSpace(meetingUrl) ? $"Link: {meetingUrl}" : $"Địa điểm: {location}"), throwOnFailure, idempotencyKey);
 
-        public Task SendInterviewReminderAsync(string to, string jobTitle, DateTime startAt, string? meetingUrl, bool throwOnFailure = false) => SendAsync(
+        public Task SendInterviewReminderAsync(string to, string jobTitle, DateTime startAt, string? meetingUrl, bool throwOnFailure = false, string? idempotencyKey = null) => SendAsync(
             to,
             $"Nhắc lịch phỏng vấn: {jobTitle}",
             $"Lịch phỏng vấn của bạn bắt đầu lúc {startAt:u}. " +
-            (!string.IsNullOrWhiteSpace(meetingUrl) ? $"Link: {meetingUrl}" : string.Empty), throwOnFailure);
+            (!string.IsNullOrWhiteSpace(meetingUrl) ? $"Link: {meetingUrl}" : string.Empty), throwOnFailure, idempotencyKey);
 
-        public Task SendInterviewRescheduledAsync(string to, string jobTitle, DateTime startAt, string? meetingUrl, string? location, bool throwOnFailure = false) => SendAsync(
+        public Task SendInterviewRescheduledAsync(string to, string jobTitle, DateTime startAt, string? meetingUrl, string? location, bool throwOnFailure = false, string? idempotencyKey = null) => SendAsync(
             to,
             $"Lịch phỏng vấn đã thay đổi: {jobTitle}",
             $"Lịch phỏng vấn cho vị trí \"{jobTitle}\" đã được dời sang {startAt:u}. " +
-            (!string.IsNullOrWhiteSpace(meetingUrl) ? $"Link: {meetingUrl}" : $"Địa điểm: {location}"), throwOnFailure);
+            (!string.IsNullOrWhiteSpace(meetingUrl) ? $"Link: {meetingUrl}" : $"Địa điểm: {location}"), throwOnFailure, idempotencyKey);
 
-        public Task SendInterviewCancelledAsync(string to, string jobTitle, bool throwOnFailure = false) => SendAsync(
+        public Task SendInterviewCancelledAsync(string to, string jobTitle, bool throwOnFailure = false, string? idempotencyKey = null) => SendAsync(
             to,
             $"Lịch phỏng vấn đã hủy: {jobTitle}",
-            $"Lịch phỏng vấn cho vị trí \"{jobTitle}\" đã được hủy. Hồ sơ đã trở về bước Screening nếu còn phù hợp.", throwOnFailure);
+            $"Lịch phỏng vấn cho vị trí \"{jobTitle}\" đã được hủy. Hồ sơ đã trở về bước Screening nếu còn phù hợp.", throwOnFailure, idempotencyKey);
 
-        public Task SendNewsletterAsync(string to, IReadOnlyList<string> jobTitles, bool throwOnFailure = false) => SendAsync(
+        public Task SendNewsletterAsync(string to, IReadOnlyList<string> jobTitles, bool throwOnFailure = false, string? idempotencyKey = null) => SendAsync(
             to,
             "Việc làm mới trên JobPortal",
             jobTitles.Count == 0
                 ? "Tuần này chưa có việc làm mới phù hợp."
-                : "Các tin tuyển dụng mới:\n- " + string.Join("\n- ", jobTitles), throwOnFailure);
+                : "Các tin tuyển dụng mới:\n- " + string.Join("\n- ", jobTitles), throwOnFailure, idempotencyKey);
 
-        public Task SendPasswordResetAsync(string to, string token)
+        public Task SendPasswordResetAsync(string to, string token, string? idempotencyKey = null)
         {
             var frontendUrl = (_configuration["Frontend:BaseUrl"]
                 ?? Environment.GetEnvironmentVariable("FRONTEND_URL")
@@ -67,14 +67,15 @@ namespace JobPortalApi.Services.Notifications
             return SendAsync(
                 to,
                 "Đặt lại mật khẩu JobPortal",
-                $"Mở liên kết sau để đặt lại mật khẩu (liên kết hết hạn sau 15 phút): {resetUrl}");
+                $"Mở liên kết sau để đặt lại mật khẩu (liên kết hết hạn sau 15 phút): {resetUrl}", true, idempotencyKey);
         }
 
-        private async Task SendAsync(string to, string subject, string text, bool throwOnFailure = false)
+        private async Task SendAsync(string to, string subject, string text, bool throwOnFailure = false, string? idempotencyKey = null)
         {
             var webhookUrl = _configuration["Email:WebhookUrl"]
                 ?? Environment.GetEnvironmentVariable("EMAIL_WEBHOOK_URL");
-            if (string.IsNullOrWhiteSpace(webhookUrl)) return;
+            if (string.IsNullOrWhiteSpace(webhookUrl))
+                throw new InvalidOperationException("Email:WebhookUrl chưa được cấu hình.");
 
             try
             {
@@ -86,6 +87,8 @@ namespace JobPortalApi.Services.Notifications
                     ?? Environment.GetEnvironmentVariable("EMAIL_WEBHOOK_SECRET");
                 if (!string.IsNullOrWhiteSpace(secret))
                     request.Headers.Authorization = new("Bearer", secret);
+                if (!string.IsNullOrWhiteSpace(idempotencyKey))
+                    request.Headers.TryAddWithoutValidation("Idempotency-Key", idempotencyKey);
 
                 using var response = await _httpClientFactory
                     .CreateClient("email-provider")
