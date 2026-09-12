@@ -15,16 +15,18 @@ namespace JobPortalApi.Services.User
 
         public async Task<RecruiterDashboardDto> GetDashboardAsync(Guid recruiterId)
         {
-            var jobPosts = await _context.JobPosts
-                .Where(j => j.EmployerId == recruiterId)
-                .OrderByDescending(j => j.CreatedAt)
-                .ToListAsync();
+            var jobPosts = _context.JobPosts
+                .AsNoTracking()
+                .Where(j => j.EmployerId == recruiterId);
 
+            var totalJobPosts = await jobPosts.CountAsync();
             var totalApplicants = await _context.Jobs
-                .Where(a => jobPosts.Select(j => j.Id).Contains(a.JobPostId))
-                .CountAsync();
+                .AsNoTracking()
+                .CountAsync(a => a.JobPost.EmployerId == recruiterId);
 
-            var recentJobPosts = jobPosts
+            var recentJobPosts = await jobPosts
+                .OrderByDescending(j => j.CreatedAt)
+                .ThenBy(j => j.Id)
                 .Take(5)
                 .Select(j => new JobPostSummaryDto
                 {
@@ -32,11 +34,14 @@ namespace JobPortalApi.Services.User
                     Title = j.Title,
                     CreatedAt = j.CreatedAt,
                     Applicants = j.Applicants
-                }).ToList();
+                })
+                .ToListAsync();
 
             var recentApplicants = await _context.Jobs
-                .Where(a => jobPosts.Select(j => j.Id).Contains(a.JobPostId))
+                .AsNoTracking()
+                .Where(a => a.JobPost.EmployerId == recruiterId)
                 .OrderByDescending(a => a.AppliedAt)
+                .ThenBy(a => a.Id)
                 .Take(5)
                 .Select(a => new CandidateApplyDto
                 {
@@ -49,7 +54,7 @@ namespace JobPortalApi.Services.User
 
             return new RecruiterDashboardDto
             {
-                TotalJobPosts = jobPosts.Count,
+                TotalJobPosts = totalJobPosts,
                 TotalApplicants = totalApplicants,
                 RecentJobPosts = recentJobPosts,
                 RecentApplicants = recentApplicants
