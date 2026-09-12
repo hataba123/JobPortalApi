@@ -1,5 +1,7 @@
 ﻿using System.ComponentModel.DataAnnotations.Schema;
 
+using System.ComponentModel.DataAnnotations;
+
 namespace JobPortalApi.Models
 {
 
@@ -24,6 +26,15 @@ namespace JobPortalApi.Models
         public int FailedLoginAttempts { get; set; }
         public DateTime? LockoutUntil { get; set; }
         public DateTime? DeletedAt { get; set; }
+
+        [MaxLength(30)]
+        public string? Phone { get; set; }
+
+        public bool EmailNotifications { get; set; } = true;
+        public bool JobAlerts { get; set; } = true;
+        public bool MarketingEmails { get; set; }
+        public bool ProfileVisibility { get; set; } = true;
+        public bool ApplicationUpdates { get; set; } = true;
 
 
         /// Role assigned to the user (Admin, Recruiter, or Candidate).

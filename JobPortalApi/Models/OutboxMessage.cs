@@ -25,6 +25,11 @@ public sealed class OutboxMessage
 
     public DateTime? DeadLetteredAt { get; set; }
 
+    [MaxLength(64)]
+    public string? LockedBy { get; set; }
+
+    public DateTime? LockExpiresAt { get; set; }
+
     [MaxLength(200)]
     public string? DeduplicationKey { get; set; }
 

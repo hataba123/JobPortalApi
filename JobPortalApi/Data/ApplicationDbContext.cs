@@ -41,6 +41,7 @@ public class ApplicationDbContext : DbContext
     public DbSet<NewsletterSubscription> NewsletterSubscriptions { get; set; }
     public DbSet<CandidateSkill> CandidateSkills { get; set; }
     public DbSet<JobReport> JobReports { get; set; }
+    public DbSet<CompanyFollow> CompanyFollows { get; set; }
 
     // Thêm các DbSet khác nếu có
 
@@ -66,6 +67,10 @@ public class ApplicationDbContext : DbContext
         // Nếu muốn map bảng Users cũng vậy
         modelBuilder.Entity<User>()
             .ToTable("Users");
+        modelBuilder.Entity<User>().Property(user => user.EmailNotifications).HasDefaultValue(true);
+        modelBuilder.Entity<User>().Property(user => user.JobAlerts).HasDefaultValue(true);
+        modelBuilder.Entity<User>().Property(user => user.ApplicationUpdates).HasDefaultValue(true);
+        modelBuilder.Entity<User>().Property(user => user.ProfileVisibility).HasDefaultValue(true);
         modelBuilder.Entity<User>()
             .HasQueryFilter(user => user.DeletedAt == null)
             .HasIndex(user => user.DeletedAt);
@@ -116,6 +121,8 @@ public class ApplicationDbContext : DbContext
         modelBuilder.Entity<Job>()
             .HasIndex(a => new { a.CandidateId, a.JobPostId })
             .IsUnique();
+        modelBuilder.Entity<Job>()
+            .HasIndex(a => new { a.JobPostId, a.Id });
 
         modelBuilder.Entity<ApplicationStatusHistory>()
             .HasOne(history => history.Application)
@@ -153,6 +160,8 @@ public class ApplicationDbContext : DbContext
 
         modelBuilder.Entity<OutboxMessage>()
             .HasIndex(message => new { message.ProcessedAt, message.NextAttemptAt, message.OccurredAt });
+        modelBuilder.Entity<OutboxMessage>()
+            .HasIndex(message => new { message.ProcessedAt, message.DeadLetteredAt, message.LockExpiresAt, message.NextAttemptAt });
         modelBuilder.Entity<OutboxMessage>()
             .HasIndex(message => message.DeduplicationKey)
             .IsUnique()
@@ -213,6 +222,20 @@ public class ApplicationDbContext : DbContext
         modelBuilder.Entity<SavedJob>()
             .HasIndex(s => new { s.UserId, s.JobPostId })
             .IsUnique();
+
+        modelBuilder.Entity<CompanyFollow>()
+            .HasIndex(item => new { item.UserId, item.CompanyId })
+            .IsUnique();
+        modelBuilder.Entity<CompanyFollow>()
+            .HasOne(item => item.User)
+            .WithMany()
+            .HasForeignKey(item => item.UserId)
+            .OnDelete(DeleteBehavior.Restrict);
+        modelBuilder.Entity<CompanyFollow>()
+            .HasOne(item => item.Company)
+            .WithMany()
+            .HasForeignKey(item => item.CompanyId)
+            .OnDelete(DeleteBehavior.Restrict);
 
         modelBuilder.Entity<MatchResult>()
             .HasIndex(m => new { m.CandidateId, m.JobPostId })
